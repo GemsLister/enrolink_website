@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-export default function AuthLayout({ title, subtitle, children, illustration, logo }) {
+export default function AuthLayout({ title, subtitle, children, illustration, logo, greetings }) {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#f4c3c6] via-[#f3b1b7] to-[#f0a5ad] flex items-center justify-center p-4">
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white/90 rounded-2xl shadow-lg overflow-hidden">
@@ -27,6 +27,9 @@ export default function AuthLayout({ title, subtitle, children, illustration, lo
           <h1 className="text-2xl font-extrabold text-[#202124] text-center">{title}</h1>
           {subtitle ? (
             <p className="text-center text-[#5b5c60] mt-1">{subtitle}</p>
+          ) : null}
+          {greetings ? (
+            <p className="text-center text-[#5b5c60] mt-1">{greetings}</p>
           ) : null}
           <div className="mt-6">{children}</div>
           <div className="text-center text-sm text-[#5b5c60] mt-6">

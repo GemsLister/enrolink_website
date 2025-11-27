@@ -7,9 +7,10 @@ const InterviewSchema = new mongoose.Schema(
     interviewerName: String,
     date: Date,
     result: { type: String, enum: ['PENDING', 'PASSED', 'FAILED'], default: 'PENDING' },
-    batch: String
+    batch: String,
+    examScore: { type: Number }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 let _model;

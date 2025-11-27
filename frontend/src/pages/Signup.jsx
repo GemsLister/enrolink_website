@@ -10,7 +10,6 @@ import GoogleSignIn from '../components/GoogleSignIn'
 export default function Signup() {
   const [search] = useSearchParams()
   const inviteToken = search.get('token') || ''
-  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,8 +22,8 @@ export default function Signup() {
     setLoading(true)
     setError('')
     try {
-      // Backend expects token, name, password. Email is implied by invite but we collect it to mirror design and for validation UX.
-      const res = await api.signupWithInvite({ token: inviteToken, name, password, captcha })
+      // Backend expects token and password. Email is implied by invite.
+      const res = await api.signupWithInvite({ token: inviteToken, password, captcha })
       localStorage.setItem('token', res.token)
       navigate('/dashboard')
     } catch (err) {
@@ -53,10 +52,6 @@ export default function Signup() {
           }}
         />
         <div className="text-center text-xs text-[#5b5c60]">OR SIGN UP WITH EMAIL</div>
-        <div className="space-y-1">
-          <label className="text-sm">Name</label>
-          <input value={name} onChange={(e)=>setName(e.target.value)} required className="w-full border-b border-[#c8c8c8] focus:outline-none focus:border-[#8a1d35] py-2" />
-        </div>
         <div className="space-y-1">
           <label className="text-sm">Email</label>
           <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="(from invite)" disabled className="w-full border-b border-[#e2e2e2] bg-gray-50 py-2" />

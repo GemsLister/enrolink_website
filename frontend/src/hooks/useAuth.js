@@ -30,11 +30,18 @@ export function useAuth() {
 
   const isAuthenticated = !!token
 
-  const login = useCallback(async ({ email, password, captcha }) => {
-    const res = await api.login({ email, password, captcha })
-    setToken(res.token)
-    return res
-  }, [])
+  const login = async (credentials) => {
+  try {
+    const response = await api.login(credentials);
+    const token = response.token; // Make sure the backend returns { token: '...' }
+    localStorage.setItem('token', token);
+    setToken(token);
+    return response;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
+};
 
   const logout = useCallback(() => {
     setToken('')

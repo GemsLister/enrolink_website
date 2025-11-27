@@ -7,11 +7,13 @@ const UserSchema = new mongoose.Schema(
     passwordHash: { type: String },
     name: { type: String },
     role: { type: String, enum: ['DEPT_HEAD', 'OFFICER'], required: true },
+    assignedYear: { type: String },
     assignedBatch: { type: String },
+    canInterview: { type: Boolean, default: false },
     provider: { type: String, enum: ['local', 'google'], default: 'local' },
     googleId: { type: String }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 let _model;

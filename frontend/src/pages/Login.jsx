@@ -22,7 +22,9 @@ export default function Login() {
     try {
       const res = await api.login({ email, password, captcha })
       localStorage.setItem('token', res.token)
-      navigate('/dashboard')
+      // Redirect based on role returned from server
+      if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+      else navigate('/officer/dashboard')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -39,7 +41,8 @@ export default function Login() {
             try {
               const res = await api.google({ idToken })
               localStorage.setItem('token', res.token)
-              navigate('/dashboard')
+              if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+              else navigate('/officer/dashboard')
             } catch (e) {
               setError(e.message)
             }

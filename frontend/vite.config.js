@@ -10,7 +10,33 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '')
       },
-    },
-  },
+      '/auth': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      },
+      '/calendar': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => `/api${path}`, // /calendar/events -> /api/calendar/events
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            // Log and forward all headers
+            console.log('Proxy request headers:', {
+              authorization: req.headers.authorization ? 'Present' : 'Missing',
+              'content-type': req.headers['content-type']
+            });
+            // Ensure Authorization header is forwarded
+            if (req.headers.authorization) {
+              proxyReq.setHeader('Authorization', req.headers.authorization);
+            }
+          });
+        }
+      }
+    }
+  }
 })

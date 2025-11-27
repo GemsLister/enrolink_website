@@ -1,30 +1,51 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
+import HeadLogin from './pages/head/HeadLogin'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-
-function Dashboard() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p>Auth wiring complete. Replace this with your real dashboard.</p>
-        <Link className="text-[#8a1d35] underline" to="/login">Log out</Link>
-      </div>
-    </div>
-  )
-}
+import HeadDashboard from './pages/head/Dashboard'
+import HeadCalendar from './pages/head/Calendar'
+import StudentRecords from './pages/head/studentrecords'
+import BatchManagement from './pages/head/batchmanagement'
+import EnrollmentOfficers from './pages/head/enrollmentofficers'
+import Reports from './pages/head/reports'
+import HeadSettings from './pages/head/settings'
+import OfficerDashboard from './pages/officer/Dashboard'
+import OfficerStudentRecords from './pages/officer/studentrecords'
+import OfficerReports from './pages/officer/reports'
+import OfficerLogin from './pages/officer/Login'
+import OfficerBatchManagement from './pages/officer/batchmanagement'
+import OfficerSettings from './pages/officer/settings'
+import OfficerCalendar from './pages/officer/Calendar'
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/head/login" element={<HeadLogin />} />
+      <Route path="/officer/login" element={<OfficerLogin />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      {/* Head routes */}
+      <Route path="/dashboard" element={<Navigate to="/head/dashboard" replace />} />
+      <Route path="/head/dashboard" element={<HeadDashboard />} />
+      <Route path="/head/calendar" element={<HeadCalendar />} />
+      <Route path="/head/student-records" element={<StudentRecords />} />
+      <Route path="/head/batch-management" element={<BatchManagement />} />
+      <Route path="/head/enrollment-officers" element={<EnrollmentOfficers />} />
+      <Route path="/head/reports" element={<Reports />} />
+      <Route path="/head/settings" element={<HeadSettings />} />
+      {/* Officer routes */}
+      <Route path="/officer" element={<Navigate to="/officer/dashboard" replace />} />
+      <Route path="/officer/dashboard" element={<OfficerDashboard />} />
+      <Route path="/officer/calendar" element={<OfficerCalendar />} />
+      <Route path="/officer/student-records" element={<OfficerStudentRecords />} />
+      <Route path="/officer/reports" element={<OfficerReports />} />
+      <Route path="/officer/batch-management" element={<OfficerBatchManagement />} />
+      <Route path="/officer/settings" element={<OfficerSettings />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

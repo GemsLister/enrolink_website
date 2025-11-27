@@ -1,22 +1,64 @@
+// In backend/src/middleware/auth.js
 import jwt from 'jsonwebtoken';
 import { unauthorized, forbidden } from '../utils/errors.js';
 
-export function auth(req, res, next) {
+export const auth = async (req, res, next) => {
   try {
-    const hdr = req.headers.authorization || '';
-    const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
-    if (!token) throw unauthorized('Missing token');
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch (e) {
-    next(unauthorized('Invalid token'));
-  }
-}
+    const authHeader = req.header('Authorization');
+    console.log('Auth header:', authHeader ? 'Exists' : 'Missing');
+    
+    if (!authHeader) {
+      return next(unauthorized('No token, authorization denied'));
+    }
 
-export function requireRole(role) {
+    const token = authHeader.replace('Bearer ', '');
+    console.log('Token received:', token ? 'Exists' : 'Missing');
+    
+    if (!token) {
+      return next(unauthorized('No token, authorization denied'));
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('Token decoded successfully:', { 
+        id: decoded.id, 
+        role: decoded.role,
+        exp: new Date(decoded.exp * 1000).toISOString()
+      });
+      req.user = decoded;
+      next();
+    } catch (jwtError) {
+      console.error('JWT verification failed:', {
+        name: jwtError.name,
+        message: jwtError.message,
+        expiredAt: jwtError.expiredAt
+      });
+      throw jwtError;
+    }
+  } catch (e) {
+    console.error('Auth middleware error:', e);
+    next(unauthorized(e.message));
+  }
+};
+
+export const requireRole = (role) => {
   return (req, res, next) => {
-    if (!req.user || req.user.role !== role) return next(forbidden('Forbidden'));
+    if (!req.user || req.user.role !== role) {
+      console.log(`Role check failed: required ${role}, user role: ${req.user?.role}`);
+      return next(forbidden('Forbidden'));
+    }
     next();
   };
-}
+};
+
+export const requireAnyRole = (...roles) => {
+  const allow = roles.flat();
+  return (req, res, next) => {
+    const hasRole = req.user && allow.includes(req.user.role);
+    if (!hasRole) {
+      console.log(`Role check failed: required one of ${allow.join(', ')}, user role: ${req.user?.role}`);
+      return next(forbidden('Forbidden'));
+    }
+    next();
+  };
+};
