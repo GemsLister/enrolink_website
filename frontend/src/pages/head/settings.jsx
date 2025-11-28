@@ -7,7 +7,7 @@ import { useApi } from '../../hooks/useApi'
 export default function Settings() {
   const { isAuthenticated, user, token } = useAuth()
   const api = useApi(token)
-  const [profile, setProfile] = useState({ name: '', email: '', department: '', phone: '' })
+  const [profile, setProfile] = useState({ name: '', firstName: '', lastName: '', email: '', department: '', phone: '' })
   const [prefs, setPrefs] = useState({ notifEmail: true, notifSms: false, notifInterview: true, notifSystem: true })
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPrefs, setSavingPrefs] = useState(false)
@@ -24,7 +24,11 @@ export default function Settings() {
         const res = await api.get('/auth/me')
         const u = res.user || {}
         if (mounted) {
-          setProfile({ name: u.name || '', email: u.email || '', department: u.department || '', phone: u.phone || '' })
+          const nm = (u.name || '').trim()
+          const parts = nm.split(/\s+/)
+          const firstName = parts[0] || ''
+          const lastName = parts.slice(1).join(' ') || ''
+          setProfile({ name: nm, firstName, lastName, email: u.email || '', department: u.department || '', phone: u.phone || '' })
           setPrefs({ notifEmail: !!u.notifEmail, notifSms: !!u.notifSms, notifInterview: !!u.notifInterview, notifSystem: !!u.notifSystem })
         }
       } catch (e) { if (mounted) setErr(e.message) }
@@ -36,8 +40,13 @@ export default function Settings() {
   async function saveProfile() {
     try {
       setSavingProfile(true); setErr(''); setMsg('')
-      const res = await api.put('/auth/me', { name: profile.name, department: profile.department, phone: profile.phone })
-      setProfile(p => ({ ...p, name: res.user?.name || p.name, department: res.user?.department || p.department, phone: res.user?.phone || p.phone }))
+      const name = `${(profile.firstName||'').trim()} ${(profile.lastName||'').trim()}`.trim() || profile.name
+      const res = await api.put('/auth/me', { name, department: profile.department, phone: profile.phone })
+      const nm = res.user?.name || name
+      const parts = (nm||'').split(/\s+/)
+      const firstName = parts[0] || ''
+      const lastName = parts.slice(1).join(' ') || ''
+      setProfile(p => ({ ...p, name: nm, firstName, lastName, department: res.user?.department || p.department, phone: res.user?.phone || p.phone }))
       setMsg('Personal information updated')
     } catch (e) { setErr(e.message) } finally { setSavingProfile(false) }
   }
@@ -81,26 +90,32 @@ export default function Settings() {
   return (
     <div className="flex">
       <Sidebar />
-      <main className="flex-1 bg-gray-50 px-8 pt-8 pb-4 overflow-y-auto h-[100dvh]">
+      <main className="flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto h-[100dvh]">
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h1 className="text-5xl font-bold text-red-900 mb-2 mt-[35px]">SETTINGS</h1>
-            <p className="text-lg text-gray-1000 font-bold mt-[20px]">Manage your account and preferences</p>
+            <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">SETTINGS</h1>
+            <p className="text-lg text-[#2f2b33] mt-3">Manage your account and preferences</p>
           </div>
-          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 mt-[-50px] border-2 border-[#6b2b2b]">
+          {/* <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 mt-[-30px] border-2 border-[#6b2b2b]">
             <button onClick={exportData} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 font-medium text-sm">Export My Data</button>
-          </div>
+          </div> */}
         </div>
 
         {err && <div className="text-sm text-red-600 mb-2">{err}</div>}
         {msg && <div className="text-sm text-green-700 mb-2">{msg}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
+          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
             <h2 className="font-semibold text-gray-900">Personal Information</h2>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Full Name</label>
-              <input value={profile.name} onChange={(e)=>setProfile(p=>({...p,name:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm text-gray-700">Last Name</label>
+                <input value={profile.lastName} onChange={(e)=>setProfile(p=>({...p,lastName:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-gray-700">First Name</label>
+                <input value={profile.firstName} onChange={(e)=>setProfile(p=>({...p,firstName:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-sm text-gray-700">Email Address</label>
@@ -117,7 +132,7 @@ export default function Settings() {
             <button onClick={saveProfile} disabled={savingProfile} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{savingProfile?'Saving…':'Update Personal Information'}</button>
           </section>
 
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
+          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
             <h2 className="font-semibold text-gray-900">Notification Preferences</h2>
             <Toggle label="Email Notifications" checked={prefs.notifEmail} onChange={v=>setPrefs(p=>({...p,notifEmail:v}))} />
             <Toggle label="SMS Notifications" checked={prefs.notifSms} onChange={v=>setPrefs(p=>({...p,notifSms:v}))} />
@@ -128,7 +143,7 @@ export default function Settings() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
+          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
             <h2 className="font-semibold text-gray-900">Security Settings</h2>
             <div className="space-y-1">
               <label className="text-sm text-gray-700">Current Password</label>
@@ -141,14 +156,7 @@ export default function Settings() {
             <button onClick={changePassword} disabled={changingPw || !pw.currentPassword || !pw.newPassword} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{changingPw?'Updating…':'Update Password'}</button>
           </section>
 
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Account Actions</h2>
-            <div className="border rounded-xl p-3 bg-amber-50 border-amber-200">
-              <div className="font-medium mb-1">Export Data</div>
-              <div className="text-sm text-amber-700 mb-2">Download all your account data in a portable format.</div>
-              <button onClick={exportData} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 font-medium text-sm">Export My Data</button>
-            </div>
-          </section>
+          
         </div>
       </main>
     </div>
@@ -157,9 +165,9 @@ export default function Settings() {
 
 function Toggle({ label, checked, onChange }) {
   return (
-    <label className="flex items-center justify-between border rounded px-3 py-2">
-      <span className="text-sm">{label}</span>
-      <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked?'bg-blue-600':'bg-gray-300'}`}>
+    <label className="flex items-center justify-between border rounded-2xl px-3 py-2 border-[#cfa3ad]">
+      <span className="text-sm text-[#7d102a]">{label}</span>
+      <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked?'bg-[#6b0000]':'bg-gray-300'}`}>
         <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${checked?'translate-x-5':'translate-x-1'}`} />
       </button>
     </label>

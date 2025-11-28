@@ -16,6 +16,12 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true, optimisticConcurrency: true }
 );
 
+// Archiving support
+UserSchema.add({
+  archived: { type: Boolean, default: false },
+  archivedAt: { type: Date, default: null }
+});
+
 let _model;
 export function getOfficerUserModel() {
   if (!_model) {

@@ -12,5 +12,8 @@ r.delete('/:id', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.remove);
 r.get('/:id/students', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.students);
 r.patch('/:id/schedule', auth, requireAnyRole('DEPT_HEAD','OFFICER'), setSchedule);
 r.post('/:id/interviews/apply', auth, requireAnyRole('DEPT_HEAD','OFFICER'), applyInterviewDate);
+r.get('/archived', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.archived);
+r.patch('/:id/archive', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.remove);
+r.patch('/:id/restore', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.restore);
 
 export default r;

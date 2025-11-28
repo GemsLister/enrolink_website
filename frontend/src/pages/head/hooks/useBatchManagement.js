@@ -44,10 +44,8 @@ export function useBatchManagement(token, opts = {}) {
   }, [batches])
 
   const statusOptions = useMemo(() => {
-    const set = new Set((batches || []).map(b => b.status).filter(Boolean))
-    const base = ['Passed','Failed','Pending']
-    return ['All', ...Array.from(new Set([...base, ...Array.from(set)])).sort()]
-  }, [batches])
+    return ['All', 'ONGOING', 'COMPLETED']
+  }, [])
 
   const interviewerOptions = useMemo(() => {
     const set = new Set((batches || []).map(b => b.interviewer).filter(Boolean))
@@ -114,9 +112,8 @@ export function useBatchManagement(token, opts = {}) {
     const ids = Array.from(selectedIds)
     if (!ids.length) return
     try {
-      const cascade = window.confirm('Also delete students in these batches? Click OK to cascade delete.')
       for (const id of ids) {
-        await api.del(`/batches/${id}${cascade ? '?cascade=true' : ''}`)
+        await api.patch(`/batches/${id}/archive`, {})
       }
       setBatches(prev => prev.filter(s => !selectedIds.has(s.id)))
       clearSelection()
@@ -146,7 +143,10 @@ export function useBatchManagement(token, opts = {}) {
           year: b.year,
           index: b.index,
           interviewer: b.interviewer || '',
-          status: toUiStatus(b.status),
+          status: ((s) => {
+            const v = (s || '').toString().toUpperCase()
+            return v === 'PENDING' ? 'ONGOING' : 'COMPLETED'
+          })(b.status),
           studentsCount: b.studentsCount || 0,
           createdAt: b.createdAt || '',
         }))
@@ -171,6 +171,16 @@ export function useBatchManagement(token, opts = {}) {
     setMembers([])
     setShowAdd(false)
     setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending', examScore: '' })
+  }
+
+  const updateBatchStatus = async (batch, label) => {
+    if (!batch || !label) return
+    const apiStatus = String(label).toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING'
+    try {
+      const id = batch.id
+      await api.put(`/batches/${id}`, { status: apiStatus })
+      setBatches(prev => prev.map(b => (b.id === id ? { ...b, status: label } : b)))
+    } catch (_) {}
   }
   const closeModal = () => {
     setIsModalOpen(false)
@@ -210,11 +220,12 @@ export function useBatchManagement(token, opts = {}) {
     if (!year) return
     try {
       setAddBatchLoading(true)
-      const payload = { year, interviewer: addBatchValues.interviewer || '', status: addBatchValues.status || 'PENDING' }
+      const mappedStatus = String(addBatchValues.status || '').toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING'
+      const payload = { year, interviewer: addBatchValues.interviewer || '', status: mappedStatus }
       const res = await api.post('/batches', payload)
       const b = res?.doc
       if (b) {
-        const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: toUiStatus(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
+        const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
         setBatches(prev => [mapped, ...prev])
         setIsAddBatchOpen(false)
       }
@@ -227,11 +238,12 @@ export function useBatchManagement(token, opts = {}) {
     if (!year) return
     try {
       setAddBatchLoading(true)
-      const payload = { year, interviewer: addBatchValues.interviewer || '', status: addBatchValues.status || 'PENDING' }
+      const mappedStatus2 = String(addBatchValues.status || '').toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING'
+      const payload = { year, interviewer: addBatchValues.interviewer || '', status: mappedStatus2 }
       const res = await api.post('/batches', payload)
       const b = res?.doc
       if (b) {
-        const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: toUiStatus(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
+        const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
         setBatches(prev => [mapped, ...prev])
         setIsAddBatchOpen(false)
         // Open Import modal to append to this newly created batch
@@ -299,7 +311,7 @@ export function useBatchManagement(token, opts = {}) {
       }
       const resp = await api.post('/sheets/import', { url, batch: year, batchId })
       const res = await api.get('/batches')
-      const rows = (res?.rows || []).map((b) => ({ id: b.id, code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: toUiStatus(b.status), studentsCount: b.studentsCount || 0, createdAt: b.createdAt || '' }))
+      const rows = (res?.rows || []).map((b) => ({ id: b.id, code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: b.studentsCount || 0, createdAt: b.createdAt || '' }))
       setBatches(rows)
       setIsImportOpen(false)
       const imported = Number(resp?.imported || 0)
@@ -493,7 +505,7 @@ export function useBatchManagement(token, opts = {}) {
         }
       }
       const res = await api.get('/batches')
-      const rows = (res?.rows || []).map((b) => ({ id: b.id, code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: toUiStatus(b.status), studentsCount: b.studentsCount || 0, createdAt: b.createdAt || '' }))
+      const rows = (res?.rows || []).map((b) => ({ id: b.id, code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: b.studentsCount || 0, createdAt: b.createdAt || '' }))
       setBatches(rows)
       setIsImportOpen(false)
       if (success > 0) window.alert(`Imported ${success} students from file`)
@@ -625,5 +637,6 @@ export function useBatchManagement(token, opts = {}) {
     submitImport,
     submitImportCsv,
     handleAddStudentSubmit,
+    updateBatchStatus,
   }
 }

@@ -1,10 +1,22 @@
 import { useState, useCallback, useEffect } from "react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, addHours, isSameDay } from "date-fns";
+import {
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  addHours,
+  isSameDay,
+} from "date-fns";
 import { enUS } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useAuth } from "../hooks/useAuth";
-import { listEvents, createEvent, updateEvent, deleteEvent } from "../lib/googleCalendar";
+import {
+  listEvents,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+} from "../lib/googleCalendar";
 
 // Set up the localizer
 const localizer = dateFnsLocalizer({
@@ -17,12 +29,12 @@ const localizer = dateFnsLocalizer({
 
 // Button style for toolbar
 const buttonStyle = {
-  padding: '0.5rem 1rem',
-  borderRadius: '0.25rem',
-  border: '1px solid #ccc',
-  background: 'white',
-  cursor: 'pointer',
-  fontSize: '0.875rem'
+  padding: "0.5rem 1rem",
+  borderRadius: "0.25rem",
+  border: "1px solid #ccc",
+  background: "white",
+  cursor: "pointer",
+  fontSize: "0.875rem",
 };
 
 const GoogleCalendarEmbed = () => {
@@ -31,7 +43,7 @@ const GoogleCalendarEmbed = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [date, setDate] = useState(new Date());
-  const [view, setView] = useState('week'); // 'month', 'week', 'day', 'agenda'
+  const [view, setView] = useState("week"); // 'month', 'week', 'day', 'agenda'
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -46,14 +58,14 @@ const GoogleCalendarEmbed = () => {
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      console.log('Fetching events from:', start, 'to', end);
-      
+      console.log("Fetching events from:", start, "to", end);
+
       // Get the calendar ID from environment or use 'primary'
-      const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'primary';
-      console.log('Using calendar ID:', calendarId);
-      
+      const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || "primary";
+      console.log("Using calendar ID:", calendarId);
+
       const response = await listEvents(
         {
           timeMin: start.toISOString(),
@@ -62,30 +74,46 @@ const GoogleCalendarEmbed = () => {
         },
         token
       );
-      
-      console.log('Fetched events:', response);
-      
+
+      console.log("Fetched events:", response);
+
       // Format events for the calendar
-      const formattedEvents = (response.items || []).map(event => {
-        const startDate = event.start?.dateTime 
-          ? new Date(event.start.dateTime) 
-          : new Date(event.start?.date + 'T00:00:00');
-          
-        const endDate = event.end?.dateTime 
-          ? new Date(event.end.dateTime)
-          : new Date(event.end?.date + 'T23:59:59');
-          
+      // Format events for the calendar
+      const formattedEvents = (response.items || []).map((event) => {
+        // Handle all-day events correctly
+        let startDate, endDate;
+
+        if (event.start?.dateTime) {
+          startDate = new Date(event.start.dateTime);
+        } else if (event.start?.date) {
+          // For all-day events, parse as UTC to avoid timezone shifts
+          startDate = new Date(event.start.date + "T00:00:00Z");
+        } else {
+          startDate = new Date();
+        }
+
+        if (event.end?.dateTime) {
+          endDate = new Date(event.end.dateTime);
+        } else if (event.end?.date) {
+          // For all-day events, end date in Google Calendar is exclusive
+          // So we set it to the start of that day (not end of previous day)
+          endDate = new Date(event.end.date + "T00:00:00Z");
+        } else {
+          endDate = new Date(startDate);
+          endDate.setHours(23, 59, 59);
+        }
+
         return {
           id: event.id,
-          title: event.summary || 'No title',
+          title: event.summary || "No title",
           start: startDate,
           end: endDate,
           allDay: !event.start?.dateTime,
           resource: event,
         };
       });
-      
-      console.log('Formatted events:', formattedEvents);
+
+      console.log("Formatted events:", formattedEvents);
       setEvents(formattedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -236,27 +264,30 @@ const GoogleCalendarEmbed = () => {
 
   // Handle view change
   const onView = useCallback((newView) => {
-    console.log('View changed to:', newView);
+    console.log("View changed to:", newView);
     setView(newView);
   }, []);
 
   // Handle navigation
   const onNavigate = useCallback((newDate) => {
-    console.log('Navigated to:', newDate);
+    console.log("Navigated to:", newDate);
     setDate(newDate);
   }, []);
 
   // Handle range change (month/week/day view changes)
-  const handleRangeChange = useCallback((range) => {
-    if (range.length > 0) {
-      const start = new Date(range[0]);
-      const end = new Date(range[range.length - 1]);
-      end.setHours(23, 59, 59); // End of the last day
-      
-      console.log('Calendar range changed to:', start, 'to', end);
-      fetchEvents(start, end);
-    }
-  }, [fetchEvents]);
+  const handleRangeChange = useCallback(
+    (range) => {
+      if (range.length > 0) {
+        const start = new Date(range[0]);
+        const end = new Date(range[range.length - 1]);
+        end.setHours(23, 59, 59); // End of the last day
+
+        console.log("Calendar range changed to:", start, "to", end);
+        fetchEvents(start, end);
+      }
+    },
+    [fetchEvents]
+  );
 
   // Render the modal
   const renderEventModal = () => {
@@ -381,8 +412,8 @@ const GoogleCalendarEmbed = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1); // Start from previous month
     const end = new Date(now.getFullYear(), now.getMonth() + 2, 0); // Up to next month
-    
-    console.log('Initializing calendar with date range:', start, 'to', end);
+
+    console.log("Initializing calendar with date range:", start, "to", end);
     fetchEvents(start, end);
   }, [fetchEvents]);
 
@@ -395,28 +426,30 @@ const GoogleCalendarEmbed = () => {
   }
 
   return (
-    <div style={{ height: '80vh', padding: '1rem' }}>
+    <div style={{ height: "80vh", padding: "1rem" }}>
       {error && (
-        <div style={{
-          backgroundColor: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          color: '#721c24',
-          padding: '0.75rem',
-          borderRadius: '0.25rem',
-          marginBottom: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div
+          style={{
+            backgroundColor: "#f8d7da",
+            border: "1px solid #f5c6cb",
+            color: "#721c24",
+            padding: "0.75rem",
+            borderRadius: "0.25rem",
+            marginBottom: "1rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           {error}
           <button
             onClick={() => setError(null)}
             style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.25rem',
-              cursor: 'pointer',
-              padding: '0 0.5rem'
+              background: "none",
+              border: "none",
+              fontSize: "1.25rem",
+              cursor: "pointer",
+              padding: "0 0.5rem",
             }}
           >
             &times;
@@ -424,7 +457,7 @@ const GoogleCalendarEmbed = () => {
         </div>
       )}
 
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <Calendar
           localizer={localizer}
           events={events}
@@ -438,53 +471,57 @@ const GoogleCalendarEmbed = () => {
           onSelectEvent={(event) => {
             setSelectedEvent({
               ...event,
-              start: event.start instanceof Date ? event.start : new Date(event.start),
+              start:
+                event.start instanceof Date
+                  ? event.start
+                  : new Date(event.start),
               end: event.end instanceof Date ? event.end : new Date(event.end),
             });
             setShowEventModal(true);
           }}
-          views={['month', 'week', 'day', 'agenda']}
+          views={["month", "week", "day", "agenda"]}
           components={{
             toolbar: (props) => (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-                flexWrap: 'wrap',
-                gap: '0.5rem'
-              }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
-                    onClick={() => props.onNavigate('TODAY')}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    onClick={() => props.onNavigate("TODAY")}
                     style={buttonStyle}
                   >
                     Today
                   </button>
-                  <button 
-                    onClick={() => props.onNavigate('PREV')}
+                  <button
+                    onClick={() => props.onNavigate("PREV")}
                     style={buttonStyle}
                   >
                     «
                   </button>
-                  <button 
-                    onClick={() => props.onNavigate('NEXT')}
+                  <button
+                    onClick={() => props.onNavigate("NEXT")}
                     style={buttonStyle}
                   >
                     »
                   </button>
                 </div>
-                <div style={{ fontWeight: 'bold' }}>
-                  {props.label}
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {['month', 'week', 'day', 'agenda'].map((viewType) => (
+                <div style={{ fontWeight: "bold" }}>{props.label}</div>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  {["month", "week", "day", "agenda"].map((viewType) => (
                     <button
                       key={viewType}
                       style={{
                         ...buttonStyle,
-                        backgroundColor: props.view === viewType ? '#1a73e8' : '',
-                        color: props.view === viewType ? 'white' : ''
+                        backgroundColor:
+                          props.view === viewType ? "#1a73e8" : "",
+                        color: props.view === viewType ? "white" : "",
                       }}
                       onClick={() => props.onView(viewType)}
                     >
@@ -497,114 +534,144 @@ const GoogleCalendarEmbed = () => {
           }}
           eventPropGetter={(event) => ({
             style: {
-              backgroundColor: event.color || '#1a73e8',
-              borderRadius: '4px',
+              backgroundColor: event.color || "#1a73e8",
+              borderRadius: "4px",
               opacity: 0.9,
-              color: 'white',
-              border: 'none',
-              padding: '2px 5px',
-              fontSize: '0.8rem',
+              color: "white",
+              border: "none",
+              padding: "2px 5px",
+              fontSize: "0.8rem",
             },
           })}
         />
       </div>
-      
+
       {/* Event Modal */}
       {showEventModal && selectedEvent && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '0.5rem',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <h2 style={{
-              fontSize: '1.5rem',
-              marginBottom: '1rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              {selectedEvent.id ? 'Edit Event' : 'New Event'}
-              <button 
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "100%",
+              maxWidth: "500px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: "1.5rem",
+                marginBottom: "1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              {selectedEvent.id ? "Edit Event" : "New Event"}
+              <button
                 onClick={() => setShowEventModal(false)}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer'
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
                 }}
               >
                 &times;
               </button>
             </h2>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Title</label>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                Title
+              </label>
               <input
                 type="text"
-                value={selectedEvent.title || ''}
-                onChange={(e) => setSelectedEvent({...selectedEvent, title: e.target.value})}
+                value={selectedEvent.title || ""}
+                onChange={(e) =>
+                  setSelectedEvent({ ...selectedEvent, title: e.target.value })
+                }
                 style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '0.25rem',
-                  border: '1px solid #ccc'
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "0.25rem",
+                  border: "1px solid #ccc",
                 }}
               />
             </div>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Start</label>
+                <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                  Start
+                </label>
                 <input
                   type="datetime-local"
                   value={selectedEvent.start.toISOString().slice(0, 16)}
-                  onChange={(e) => setSelectedEvent({...selectedEvent, start: new Date(e.target.value)})}
+                  onChange={(e) =>
+                    setSelectedEvent({
+                      ...selectedEvent,
+                      start: new Date(e.target.value),
+                    })
+                  }
                   style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    border: '1px solid #ccc'
+                    width: "100%",
+                    padding: "0.5rem",
+                    borderRadius: "0.25rem",
+                    border: "1px solid #ccc",
                   }}
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>End</label>
+                <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                  End
+                </label>
                 <input
                   type="datetime-local"
                   value={selectedEvent.end.toISOString().slice(0, 16)}
-                  onChange={(e) => setSelectedEvent({...selectedEvent, end: new Date(e.target.value)})}
+                  onChange={(e) =>
+                    setSelectedEvent({
+                      ...selectedEvent,
+                      end: new Date(e.target.value),
+                    })
+                  }
                   style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    border: '1px solid #ccc'
+                    width: "100%",
+                    padding: "0.5rem",
+                    borderRadius: "0.25rem",
+                    border: "1px solid #ccc",
                   }}
                 />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+              }}
+            >
               <button
                 onClick={() => setShowEventModal(false)}
                 style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.25rem',
-                  border: '1px solid #ccc',
-                  background: 'white',
-                  cursor: 'pointer'
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.25rem",
+                  border: "1px solid #ccc",
+                  background: "white",
+                  cursor: "pointer",
                 }}
               >
                 Cancel
@@ -614,12 +681,12 @@ const GoogleCalendarEmbed = () => {
                   handleSaveEvent(selectedEvent);
                 }}
                 style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.25rem',
-                  border: '1px solid #1a73e8',
-                  background: '#1a73e8',
-                  color: 'white',
-                  cursor: 'pointer'
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.25rem",
+                  border: "1px solid #1a73e8",
+                  background: "#1a73e8",
+                  color: "white",
+                  cursor: "pointer",
                 }}
               >
                 Save

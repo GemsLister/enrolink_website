@@ -3,7 +3,7 @@ import { getOfficerUserModel } from '../models/User.js';
 export async function list(req, res, next) {
   try {
     const User = getOfficerUserModel();
-    const rows = await User.find({ role: 'OFFICER' }).lean();
+    const rows = await User.find({ role: 'OFFICER', archived: { $ne: true } }).lean();
     res.json({ rows });
   } catch (e) { next(e); }
 }
@@ -34,10 +34,33 @@ export async function interviewers(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const User = getOfficerUserModel();
-    const result = await User.deleteOne({ _id: req.params.id, role: 'OFFICER' });
-    if ((result.deletedCount ?? 0) === 0) {
-      return res.status(404).json({ error: 'Officer not found' });
-    }
-    res.json({ ok: true });
+    const doc = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'OFFICER' },
+      { $set: { archived: true, archivedAt: new Date() }, $inc: { __v: 1 } },
+      { new: true }
+    ).lean();
+    if (!doc) return res.status(404).json({ error: 'Officer not found' });
+    res.json({ doc, archived: true });
+  } catch (e) { next(e); }
+}
+
+export async function archived(req, res, next) {
+  try {
+    const User = getOfficerUserModel();
+    const rows = await User.find({ role: 'OFFICER', archived: true }).lean();
+    res.json({ rows });
+  } catch (e) { next(e); }
+}
+
+export async function restore(req, res, next) {
+  try {
+    const User = getOfficerUserModel();
+    const doc = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'OFFICER' },
+      { $set: { archived: false, archivedAt: null }, $inc: { __v: 1 } },
+      { new: true }
+    ).lean();
+    if (!doc) return res.status(404).json({ error: 'Officer not found' });
+    res.json({ doc, restored: true });
   } catch (e) { next(e); }
 }

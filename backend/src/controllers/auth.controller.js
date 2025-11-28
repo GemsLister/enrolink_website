@@ -46,6 +46,7 @@ export async function login(req, res, next) {
       source = 'officers';
     }
     if (!user) return next(unauthorized('Invalid credentials'));
+    if (source === 'officers' && user.role === 'OFFICER' && user.archived) return next(unauthorized('Account archived'));
     const ok = await bcrypt.compare(password || '', user.passwordHash);
     if (!ok) return next(unauthorized('Invalid credentials'));
     const token = jwt.sign({ id: user._id, role: user.role, name: user.name, src: source }, process.env.JWT_SECRET, { expiresIn: '12h' });
@@ -235,6 +236,11 @@ export async function googleAuth(req, res, next) {
       }
     }
 
+    if (user.role === 'OFFICER') {
+      const OfficerUser = getOfficerUserModel();
+      const o = await OfficerUser.findById(user._id).lean();
+      if (o && o.archived) return next(unauthorized('Account archived'));
+    }
     const token = jwt.sign({ id: user._id, role: user.role, name: user.name }, process.env.JWT_SECRET, { expiresIn: '12h' });
     res.json({ token, role: user.role, name: user.name });
   } catch (e) { next(e); }

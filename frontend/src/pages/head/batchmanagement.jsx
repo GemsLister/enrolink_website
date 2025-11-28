@@ -30,6 +30,7 @@ export default function BatchManagement({ embedded = false }) {
       handleRowClick, closeModal, openImportForBatch, loadMembers,
       handleAddBatch, handleImport, submitImport, submitImportCsv,
       handleAddStudentSubmit,
+      updateBatchStatus,
       setQuery, setFilterBatch, setFilterStatus, setFilterInterviewer, setSortField, setSortDir,
     } = useBatchManagement(token, { allowInterviewer: user?.role === 'DEPT_HEAD' })
     if (!isAuthenticated) return <Navigate to="/login" replace />
@@ -37,11 +38,11 @@ export default function BatchManagement({ embedded = false }) {
 
     const content = (
       <>
-        <div className={`flex-1 bg-gray-50 px-8 pt-8 pb-4 overflow-y-auto ${embedded ? '' : 'h-[100dvh]'}`}>
+        <div className={`flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto ${embedded ? '' : 'h-[100dvh]'}`}>
                 <div className="flex justify-between items-start mb-8">
                     <div>
-                        <h1 className="text-5xl font-bold text-red-900 mb-2 mt-[35px]">MANAGE BATCH</h1>
-                        <p className="text-lg text-gray-1000 font-bold mt-[20px]">List of 1st Year Applicants</p>
+                        <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">MANAGE BATCH</h1>
+                        <p className="text-md text-[#2f2b33] mt-3">List of Batches</p>
                     </div>
 
                     <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-15 flex items-center gap-3 mt-[-50px]">
@@ -85,6 +86,8 @@ export default function BatchManagement({ embedded = false }) {
                     setSortField(prev => (prev===field ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), field)))
                   }}
                   getStatusBadge={getStatusBadge}
+                  statusOptions={statusOptions}
+                  onChangeStatus={(batch, label) => updateBatchStatus(batch, label)}
                 />
         </div>
             <AddBatchModal isOpen={isAddBatchOpen} setIsOpen={setIsAddBatchOpen} addBatchValues={addBatchValues} setAddBatchValues={setAddBatchValues} addBatchLoading={addBatchLoading} submitAddBatch={submitAddBatch} submitAddBatchAndImport={submitAddBatchAndImport} allowInterviewer={user?.role === 'DEPT_HEAD'} />

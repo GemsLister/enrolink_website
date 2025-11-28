@@ -9,6 +9,8 @@ const BatchSchema = new mongoose.Schema(
     interviewer: { type: String, default: '' },
     defaultInterviewDate: { type: Date },
     status: { type: String, enum: ['PENDING', 'INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED', 'AWOL'], default: 'PENDING' },
+    archived: { type: Boolean, default: false },
+    archivedAt: { type: Date, default: null },
   },
   { timestamps: true, optimisticConcurrency: true }
 );

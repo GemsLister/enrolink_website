@@ -5,7 +5,7 @@ export async function list(req, res, next) {
   try {
     const Batch = getBatchModel();
     const Student = getStudentModel();
-    const q = {};
+    const q = { archived: { $ne: true } };
     if (req.query.year) q.year = req.query.year;
     const batches = await Batch.find(q).lean();
     const ids = batches.map(b => b._id);
@@ -55,18 +55,10 @@ export async function create(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const Batch = getBatchModel();
-    const Student = getStudentModel();
     const { id } = req.params;
-    const cascade = String(req.query.cascade || '').toLowerCase() === 'true';
-    const count = await Student.countDocuments({ batchId: id });
-    if (count > 0 && !cascade) {
-      return res.status(400).json({ error: 'Batch not empty. Use ?cascade=true to delete with students.' });
-    }
-    if (cascade) {
-      await Student.deleteMany({ batchId: id });
-    }
-    await Batch.findByIdAndDelete(id);
-    res.json({ ok: true });
+    const doc = await Batch.findByIdAndUpdate(id, { $set: { archived: true, archivedAt: new Date() }, $inc: { __v: 1 } }, { new: true }).lean();
+    if (!doc) return res.status(404).json({ error: 'Batch not found' });
+    res.json({ archived: true, doc });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[batches.controller.remove] error:', e && e.stack ? e.stack : e);
@@ -105,6 +97,42 @@ export async function update(req, res, next) {
     console.error('[batches.controller.update] error:', e && e.stack ? e.stack : e);
     next(e);
   }
+}
+
+export async function archived(req, res, next) {
+  try {
+    const Batch = getBatchModel();
+    const Student = getStudentModel();
+    const batches = await Batch.find({ archived: true }).lean();
+    const ids = batches.map(b => b._id);
+    const counts = await Student.aggregate([
+      { $match: { batchId: { $in: ids } } },
+      { $group: { _id: '$batchId', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map(c => [String(c._id), c.count]));
+    const rows = batches.map(b => ({
+      id: String(b._id),
+      code: b.code,
+      year: b.year,
+      index: b.index,
+      interviewer: b.interviewer || '',
+      status: b.status || 'PENDING',
+      studentsCount: countMap.get(String(b._id)) || 0,
+      createdAt: b.createdAt,
+      archivedAt: b.archivedAt || null,
+    }));
+    res.json({ rows });
+  } catch (e) { next(e); }
+}
+
+export async function restore(req, res, next) {
+  try {
+    const Batch = getBatchModel();
+    const { id } = req.params;
+    const doc = await Batch.findByIdAndUpdate(id, { $set: { archived: false, archivedAt: null }, $inc: { __v: 1 } }, { new: true }).lean();
+    if (!doc) return res.status(404).json({ error: 'Batch not found' });
+    res.json({ restored: true, doc });
+  } catch (e) { next(e); }
 }
 
 function isDateInAcademicYear(d, yearStr) {

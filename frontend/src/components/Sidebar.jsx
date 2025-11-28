@@ -43,6 +43,15 @@ export default function HeadSidebar() {
       ),
     },
     {
+      name: 'Archive',
+      path: '/head/archive',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+    {
       name: 'Reports',
       path: '/head/reports',
       icon: (

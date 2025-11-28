@@ -51,8 +51,7 @@ const request = async (method, url, options = {}) => {
 	};
 
 	// Build URL with query params
-	// Calendar routes use /calendar directly (vite proxy handles /api prefix)
-	let fullUrl = url.startsWith('http') ? url : (url.startsWith('/calendar') ? url : `${BASE}${url}`);
+    let fullUrl = url.startsWith('http') ? url : `${BASE}${url}`;
 	if (params) {
 		const queryString = new URLSearchParams(params).toString();
 		fullUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${queryString}`;
@@ -135,39 +134,43 @@ export const api = {
 	request,
 	
 	// Auth
-	login: (payload) => request('POST', '/api/auth/login', { body: payload }),
-	google: (payload) => request('POST', '/api/auth/google', { body: payload }),
-	signupWithInvite: (payload) => request('POST', '/api/auth/signup-with-invite', { body: payload }),
-	requestPasswordReset: (payload) => request('POST', '/api/auth/request-password-reset', { body: payload }),
-	resetPassword: (payload) => request('POST', '/api/auth/reset-password', { body: payload }),
+    login: (payload) => request('POST', '/auth/login', { body: payload }),
+    google: (payload) => request('POST', '/auth/google', { body: payload }),
+    signupWithInvite: (payload) => request('POST', '/auth/signup-with-invite', { body: payload }),
+    requestPasswordReset: (payload) => request('POST', '/auth/request-password-reset', { body: payload }),
+    resetPassword: (payload) => request('POST', '/auth/reset-password', { body: payload }),
 
 	// Dashboard
-	dashboardStats: (token, year) => request('GET', `/api/dashboard/stats${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
-	dashboardActivity: (token, year) => request('GET', `/api/dashboard/activity${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
+    dashboardStats: (token, year) => request('GET', `/dashboard/stats${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
+    dashboardActivity: (token, year) => request('GET', `/dashboard/activity${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
 
 	// Officers
-	officersList: (token) => request('GET', '/api/officers', { token }),
-	officersInterviewers: (token) => request('GET', '/api/officers/interviewers', { token }),
-	officerUpdate: (token, id, payload) => request('PATCH', `/api/officers/${id}`, { body: payload, token }),
-	officerDelete: (token, id) => request('DELETE', `/api/officers/${id}`, { token }),
-	officerInvite: (token, payload) => request('POST', '/api/auth/invite', { body: payload, token }),
+    officersList: (token) => request('GET', '/officers', { token }),
+    officersInterviewers: (token) => request('GET', '/officers/interviewers', { token }),
+    officerUpdate: (token, id, payload) => request('PATCH', `/officers/${id}`, { body: payload, token }),
+    officersArchivedList: (token) => request('GET', '/officers/archived', { token }),
+    officerArchive: (token, id) => request('PATCH', `/officers/${id}/archive`, { token }),
+    officerRestore: (token, id) => request('PATCH', `/officers/${id}/restore`, { token }),
+    officerInvite: (token, payload) => request('POST', '/auth/invite', { body: payload, token }),
 
 	// Batches
-	batchesList: (token) => request('GET', '/api/batches', { token }),
+	    batchesList: (token) => request('GET', '/batches', { token }),
+	    batchesArchivedList: (token) => request('GET', '/batches/archived', { token }),
+	    batchArchive: (token, id) => request('PATCH', `/batches/${id}/archive`, { token }),
+	    batchRestore: (token, id) => request('PATCH', `/batches/${id}/restore`, { token }),
 
-	// Calendar - use /calendar directly to match vite proxy (which rewrites to /api/calendar)
-	calendarEvents: (token, { timeMin, timeMax, calendarId = 'primary' }) => {
-		const params = new URLSearchParams();
-		if (timeMin) params.append('timeMin', timeMin);
-		if (timeMax) params.append('timeMax', timeMax);
-		if (calendarId) params.append('calendarId', calendarId);
-		const queryString = params.toString();
-		// Call /calendar directly (vite proxy will rewrite to /api/calendar)
-		const url = queryString ? `/calendar/events?${queryString}` : '/calendar/events';
-		return request('GET', url, { token })
-	},
-	calendarCreate: (event, token) => request('POST', '/calendar/events', { body: event, token }),
-	calendarUpdate: (eventId, event, token) => request('PATCH', `/calendar/events/${eventId}`, { body: event, token }),
-	calendarDelete: (token, eventId) => request('DELETE', `/calendar/events/${eventId}`, { token }),
-	calendarPushToGoogle: (token) => request('POST', '/calendar/push', { token }) // Push database events to Google Calendar
+    // Calendar
+    calendarEvents: (token, { timeMin, timeMax, calendarId = 'primary' }) => {
+        const params = new URLSearchParams();
+        if (timeMin) params.append('timeMin', timeMin);
+        if (timeMax) params.append('timeMax', timeMax);
+        if (calendarId) params.append('calendarId', calendarId);
+        const queryString = params.toString();
+        const url = queryString ? `/calendar/events?${queryString}` : '/calendar/events';
+        return request('GET', url, { token })
+    },
+    calendarCreate: (event, token) => request('POST', '/calendar/events', { body: event, token }),
+    calendarUpdate: (eventId, event, token) => request('PATCH', `/calendar/events/${eventId}`, { body: event, token }),
+    calendarDelete: (token, eventId) => request('DELETE', `/calendar/events/${eventId}`, { token }),
+    calendarPushToGoogle: (token) => request('POST', '/calendar/push', { token }) // Push database events to Google Calendar
 };
