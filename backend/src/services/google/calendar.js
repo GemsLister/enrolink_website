@@ -120,7 +120,13 @@ function loadCredentials() {
 function authClient() {
   const creds = loadCredentials();
   const scopes = ['https://www.googleapis.com/auth/calendar'];
-  const jwt = new google.auth.JWT(creds.client_email, null, creds.private_key, scopes);
+  const jwt = new google.auth.JWT({
+    email: creds.client_email,
+    key: creds.private_key,
+    keyId: creds.private_key_id,
+    subject: creds.client_email,
+    scopes,
+  });
   return jwt;
 }
 

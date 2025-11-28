@@ -41,5 +41,7 @@ const eventSchema = new mongoose.Schema({
 
 // Add index for better query performance
 eventSchema.index({ user: 1, start: 1, end: 1 });
+// Add unique compound index to prevent duplicate events for the same user with same googleEventId
+eventSchema.index({ user: 1, googleEventId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Event', eventSchema);

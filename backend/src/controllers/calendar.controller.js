@@ -1,6 +1,7 @@
 import { listEvents, createEvent, deleteEvent as gcalDelete, updateEvent, listCalendars, testCalendarAccess, getAutoCalendarId } from '../services/google/calendar.js';
 import Schedule from '../models/Schedule.js';
 import Event from '../models/Event.js';
+import mongoose from 'mongoose';
 import { google } from 'googleapis';
 
 async function fetchDatabaseEvents(userId, { timeMin, timeMax }) {
@@ -91,7 +92,104 @@ export async function list(req, res, next) {
     // Try to get events from Google Calendar
     try {
       const events = await listEvents(cid, { timeMin, timeMax });
-      return res.json({ events: events || [] });
+      
+      // Automatically sync ALL Google Calendar events to database first
+      // This includes both existing events and new events created directly in Google Calendar
+      let syncedEventIds = new Set();
+      if (userId && events && events.length > 0) {
+        try {
+          // Sync each event to database
+          for (const gEvent of events) {
+            if (!gEvent.start || !gEvent.end) continue;
+            
+            const eventStart = new Date(gEvent.start.dateTime || gEvent.start.date);
+            const eventEnd = new Date(gEvent.end.dateTime || gEvent.end.date);
+            const eventTitle = gEvent.summary || 'No Title';
+            const isAllDay = !!gEvent.start.date;
+            
+            // Sync event to database (create or update)
+            // Use findOneAndUpdate with upsert to atomically check and create/update
+            try {
+              await Event.findOneAndUpdate(
+                { googleEventId: gEvent.id, user: userId },
+                {
+                  title: eventTitle,
+                  description: gEvent.description || '',
+                  start: eventStart,
+                  end: eventEnd,
+                  allDay: isAllDay,
+                  googleEventId: gEvent.id,
+                  user: userId,
+                },
+                { 
+                  upsert: true, 
+                  new: true, 
+                  setDefaultsOnInsert: true,
+                  runValidators: true
+                }
+              );
+              syncedEventIds.add(gEvent.id); // Track successfully synced events
+            } catch (duplicateError) {
+              // If duplicate key error (unique index violation), event was created by another request
+              if (duplicateError.code === 11000) {
+                const existingEvent = await Event.findOne({ googleEventId: gEvent.id, user: userId });
+                if (existingEvent) {
+                  await Event.findOneAndUpdate(
+                    { _id: existingEvent._id },
+                    {
+                      title: eventTitle,
+                      description: gEvent.description || '',
+                      start: eventStart,
+                      end: eventEnd,
+                      allDay: isAllDay,
+                    },
+                    { new: true }
+                  );
+                }
+                syncedEventIds.add(gEvent.id);
+                console.log(`Event ${gEvent.id} already exists for user ${userId}, updated existing record`);
+              } else {
+                throw duplicateError;
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing events to database:', syncError);
+        }
+      }
+      
+      // Get events from database that might not be in Google Calendar
+      // This includes events that were created in the app or events that exist in DB but not in Google Calendar
+      let dbEvents = [];
+      if (userId) {
+        try {
+          dbEvents = await fetchDatabaseEvents(userId, { timeMin, timeMax });
+        } catch (dbError) {
+          console.error('Error fetching database events:', dbError);
+        }
+      }
+      
+      // Create a map of Google Calendar events by ID for quick lookup
+      const googleEventMap = new Map();
+      (events || []).forEach(event => {
+        if (event.id) {
+          googleEventMap.set(event.id, event);
+        }
+      });
+      
+      // Add database events that don't exist in Google Calendar
+      // This handles cases where events exist in database but were deleted from Google Calendar
+      dbEvents.forEach(dbEvent => {
+        if (dbEvent.id && !googleEventMap.has(dbEvent.id)) {
+          // Event exists in database but not in Google Calendar - include it
+          googleEventMap.set(dbEvent.id, dbEvent);
+        }
+      });
+      
+      // Convert map back to array
+      const allEvents = Array.from(googleEventMap.values());
+      
+      return res.json({ events: allEvents });
     } catch (gcalError) {
       console.error('Google Calendar API error:', {
         message: gcalError.message,
@@ -151,21 +249,141 @@ export async function remove(req, res, next) {
       return res.json({ ok: true });
     }
     
-    // Delete from Google Calendar
-    await gcalDelete(cid, id);
+    const isDbOnlyId = id.startsWith('db_');
+    const possibleDbId = isDbOnlyId ? id.substring(3) : id;
+    let deletedFromGoogle = false;
+    let deletedFromDatabase = false;
+    let googleEventIdToDelete = null;
     
-    // Also delete from database if the event exists
+    // First, try to find the event in database to get googleEventId if deleting by database ID
     const userId = req.user?.id;
-    if (userId) {
+    let dbEvent = null;
+    
+    if (isDbOnlyId || mongoose.Types.ObjectId.isValid(possibleDbId)) {
+      // This is a database ID, find the event first to get googleEventId
+      const findConditions = [];
+      if (mongoose.Types.ObjectId.isValid(possibleDbId)) {
+        findConditions.push({ _id: possibleDbId });
+      }
+      
+      if (findConditions.length) {
+        if (userId) {
+          dbEvent = await Event.findOne({
+            user: userId,
+            $or: findConditions,
+          });
+        }
+        
+        if (!dbEvent) {
+          dbEvent = await Event.findOne({
+            $or: findConditions,
+          });
+        }
+        
+        if (dbEvent && dbEvent.googleEventId) {
+          googleEventIdToDelete = dbEvent.googleEventId;
+        }
+      }
+    } else {
+      // This might be a Google Calendar ID, try to find in database
+      if (userId) {
+        dbEvent = await Event.findOne({ googleEventId: id, user: userId });
+      }
+      if (!dbEvent) {
+        dbEvent = await Event.findOne({ googleEventId: id });
+      }
+      googleEventIdToDelete = id; // Assume the ID is the googleEventId
+    }
+    
+    // Delete from Google Calendar if we have a googleEventId
+    if (googleEventIdToDelete) {
       try {
-        await Event.findOneAndDelete({ googleEventId: id, user: userId });
-      } catch (dbError) {
-        console.error('Error deleting event from database:', dbError);
-        // Continue even if database delete fails - event is already deleted from Google Calendar
+        await gcalDelete(cid, googleEventIdToDelete);
+        deletedFromGoogle = true;
+      } catch (gcalError) {
+        const statusCode = gcalError?.response?.status || gcalError?.code;
+        if (statusCode === 404) {
+          console.warn(`Google Calendar event ${googleEventIdToDelete} not found; continuing with database cleanup.`);
+        } else {
+          console.error('Error deleting from Google Calendar:', gcalError);
+          // Continue with database deletion even if Google Calendar deletion fails
+        }
       }
     }
     
-    return res.json({ ok: true });
+    // Delete from database
+    // If we found the event earlier, use its _id directly for most reliable deletion
+    if (dbEvent && dbEvent._id) {
+      try {
+        console.log(`Deleting event from database using found _id: ${dbEvent._id}`);
+        const deleteResult = await Event.deleteOne({ _id: dbEvent._id });
+        console.log(`Delete result:`, deleteResult);
+        deletedFromDatabase = deleteResult.deletedCount > 0;
+        if (deletedFromDatabase) {
+          console.log(`✅ Successfully deleted event ${dbEvent._id} from database`);
+        } else {
+          console.warn(`⚠️ Event ${dbEvent._id} not found for deletion (may have been already deleted)`);
+        }
+      } catch (dbError) {
+        console.error('❌ Error deleting event from database by _id:', dbError);
+        throw dbError;
+      }
+    } else {
+      // Fallback: try to delete using googleEventId or possibleDbId
+      const deleteConditions = [];
+      if (googleEventIdToDelete) {
+        deleteConditions.push({ googleEventId: googleEventIdToDelete });
+      }
+      if (mongoose.Types.ObjectId.isValid(possibleDbId)) {
+        deleteConditions.push({ _id: possibleDbId });
+      }
+      
+      if (deleteConditions.length) {
+        try {
+          console.log(`Attempting to delete event from database with conditions:`, deleteConditions);
+          let deleteResult = null;
+
+          // First try with user filter if userId is available
+          if (userId) {
+            deleteResult = await Event.deleteOne({
+              user: userId,
+              $or: deleteConditions,
+            });
+            console.log(`Delete with user filter result:`, deleteResult);
+            if (deleteResult.deletedCount > 0) {
+              deletedFromDatabase = true;
+            }
+          }
+
+          // If no deletion happened with user filter, try without user filter
+          // This handles cases where events might be shared or user doesn't match
+          if (!deletedFromDatabase) {
+            deleteResult = await Event.deleteOne({
+              $or: deleteConditions,
+            });
+            console.log(`Delete without user filter result:`, deleteResult);
+            deletedFromDatabase = deleteResult.deletedCount > 0;
+          }
+
+          if (!deletedFromDatabase) {
+            console.warn(`⚠️ Event not found in database for deletion. Conditions:`, deleteConditions);
+          } else {
+            console.log(`✅ Successfully deleted event from database`);
+          }
+        } catch (dbError) {
+          console.error('❌ Error deleting event from database:', dbError);
+          throw dbError;
+        }
+      } else {
+        console.warn(`⚠️ No delete conditions generated. ID: ${id}, googleEventIdToDelete: ${googleEventIdToDelete}, possibleDbId: ${possibleDbId}`);
+      }
+    }
+    
+    if (!deletedFromGoogle && !deletedFromDatabase && !isDbOnlyId && !googleEventIdToDelete) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    return res.json({ ok: true, deletedFrom: { google: deletedFromGoogle, database: deletedFromDatabase } });
   } catch (e) {
     const status = e?.response?.status || e?.code === 401 ? 401 : (e?.code === 403 ? 403 : 500);
     const message = e?.response?.data?.error?.message || e?.message || 'Calendar error';
