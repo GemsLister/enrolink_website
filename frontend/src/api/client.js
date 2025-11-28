@@ -52,7 +52,16 @@ const request = async (method, url, options = {}) => {
 
 	// Build URL with query params
 	// Calendar routes use /calendar directly (vite proxy handles /api prefix)
-	let fullUrl = url.startsWith('http') ? url : (url.startsWith('/calendar') ? url : `${BASE}${url}`);
+	let fullUrl;
+	if (url.startsWith('http')) {
+		fullUrl = url;
+	} else if (url.startsWith('/calendar')) {
+		fullUrl = url;
+	} else if (url.startsWith('/api')) {
+		fullUrl = url;
+	} else {
+		fullUrl = `${BASE}${url}`;
+	}
 	if (params) {
 		const queryString = new URLSearchParams(params).toString();
 		fullUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${queryString}`;

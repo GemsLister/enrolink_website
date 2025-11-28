@@ -16,11 +16,11 @@ export default function HeadSidebar() {
       ),
     },
     {
-      name: 'Student Records',
-      path: '/head/student-records',
+      name: 'Records',
+      path: '/head/records',
       icon: (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M4 5a2 2 0 012-2h6l2 2h6a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
         </svg>
       ),
     },
@@ -66,7 +66,7 @@ export default function HeadSidebar() {
     if (path === '/head/dashboard') {
       return location.pathname === '/head/dashboard' || location.pathname === '/head'
     }
-    return location.pathname === path
+    return location.pathname === path || location.pathname.startsWith(`${path}/`)
   }
 
   return (

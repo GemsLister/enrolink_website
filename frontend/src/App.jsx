@@ -6,13 +6,13 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import HeadDashboard from './pages/head/Dashboard'
 import HeadCalendar from './pages/head/Calendar'
-import StudentRecords from './pages/head/studentrecords'
+import StudentRecords, { HeadRecordsOverview } from './pages/head/studentrecords'
 import BatchManagement from './pages/head/batchmanagement'
 import EnrollmentOfficers from './pages/head/enrollmentofficers'
 import Reports from './pages/head/reports'
 import HeadSettings from './pages/head/settings'
 import OfficerDashboard from './pages/officer/Dashboard'
-import OfficerStudentRecords from './pages/officer/studentrecords'
+import OfficerStudentRecords, { OfficerRecordsOverview } from './pages/officer/studentrecords'
 import OfficerReports from './pages/officer/reports'
 import OfficerLogin from './pages/officer/Login'
 import OfficerBatchManagement from './pages/officer/batchmanagement'
@@ -33,7 +33,11 @@ function App() {
       <Route path="/dashboard" element={<Navigate to="/head/dashboard" replace />} />
       <Route path="/head/dashboard" element={<HeadDashboard />} />
       <Route path="/head/calendar" element={<HeadCalendar />} />
-      <Route path="/head/student-records" element={<StudentRecords />} />
+      <Route path="/head/records" element={<HeadRecordsOverview />} />
+      <Route path="/head/records/applicants" element={<StudentRecords view="applicants" />} />
+      <Route path="/head/records/enrollees" element={<StudentRecords view="enrollees" />} />
+      <Route path="/head/records/students" element={<StudentRecords view="students" />} />
+      <Route path="/head/student-records" element={<Navigate to="/head/records/applicants" replace />} />
       <Route path="/head/batch-management" element={<BatchManagement />} />
       <Route path="/head/enrollment-officers" element={<EnrollmentOfficers />} />
       <Route path="/head/reports" element={<Reports />} />
@@ -42,7 +46,11 @@ function App() {
       <Route path="/officer" element={<Navigate to="/officer/dashboard" replace />} />
       <Route path="/officer/dashboard" element={<OfficerDashboard />} />
       <Route path="/officer/calendar" element={<OfficerCalendar />} />
-      <Route path="/officer/student-records" element={<OfficerStudentRecords />} />
+      <Route path="/officer/records" element={<OfficerRecordsOverview />} />
+      <Route path="/officer/records/applicants" element={<OfficerStudentRecords view="applicants" />} />
+      <Route path="/officer/records/enrollees" element={<OfficerStudentRecords view="enrollees" />} />
+      <Route path="/officer/records/students" element={<OfficerStudentRecords view="students" />} />
+      <Route path="/officer/student-records" element={<Navigate to="/officer/records/applicants" replace />} />
       <Route path="/officer/reports" element={<OfficerReports />} />
       <Route path="/officer/batch-management" element={<OfficerBatchManagement />} />
       <Route path="/officer/settings" element={<OfficerSettings />} />

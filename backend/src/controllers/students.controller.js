@@ -1,11 +1,21 @@
 import { getStudentModel } from '../models/Student.js';
 import { getInterviewModel } from '../models/Interview.js';
 
+function buildNameSignature({ firstName, middleName, lastName }) {
+  const normalize = (value) => (value || '').trim().toLowerCase();
+  const first = normalize(firstName);
+  const middle = normalize(middleName);
+  const last = normalize(lastName);
+  if (!first && !last) return '';
+  return [first, middle, last].join('|');
+}
+
 export async function list(req, res, next) {
   try {
     const Student = getStudentModel();
     const q = {};
     if (req.query.batch) q.batch = req.query.batch;
+    if (req.query.recordCategory) q.recordCategory = req.query.recordCategory;
     const rows = await Student.find(q).lean();
     res.json({ rows });
   } catch (e) { 
@@ -20,15 +30,33 @@ export async function upsert(req, res, next) {
   try {
     const Student = getStudentModel();
     const { id, __v, ...data } = req.body;
+
+     const nameSignature = buildNameSignature(data);
+     if (nameSignature) {
+      data.nameSignature = nameSignature;
+    }
+
     if (id) {
       const filter = { _id: id };
       if (__v !== undefined) filter.__v = __v;
+      if (nameSignature) {
+        const duplicate = await Student.findOne({ nameSignature, _id: { $ne: id } }).lean();
+        if (duplicate) {
+          return res.status(409).json({ error: 'A record with the same full name already exists.' });
+        }
+      }
       const result = await Student.updateOne(filter, { $set: data, $inc: { __v: 1 } });
       if ((result.modifiedCount ?? result.nModified ?? 0) === 0) {
         return res.status(409).json({ error: 'Conflict: record has been modified by another user' });
       }
       const doc = await Student.findById(id).lean();
       return res.json({ doc });
+    }
+    if (nameSignature) {
+      const duplicate = await Student.findOne({ nameSignature }).lean();
+      if (duplicate) {
+        return res.status(409).json({ error: 'A record with the same full name already exists.' });
+      }
     }
     const doc = await Student.create(data);
     res.json({ doc });
