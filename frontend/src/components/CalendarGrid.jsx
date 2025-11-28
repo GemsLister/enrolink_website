@@ -3,11 +3,9 @@ import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enUS } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import {
-  listEvents,
-  deleteEvent as gcDeleteEvent,
-} from "../lib/googleCalendar";
+import { listEvents } from "../lib/googleCalendar";
 import { useAuth } from "../hooks/useAuth";
+import { api } from "../api/client";
 import ScheduleCreateModal from "./ScheduleCreateModal";
 
 const localizer = dateFnsLocalizer({
@@ -60,14 +58,37 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
           ? data.items
           : (Array.isArray(data) ? data : []);
 
+        const parseAllDayDate = (dateStr) => {
+          if (!dateStr) return null;
+          const [year, month, day] = dateStr.split('-').map(Number);
+          return new Date(year, month - 1, day);
+        };
+
         console.log(`Found ${items.length} events`);
         const mapped = items.map((ev) => {
+          const isAllDay = !!ev.start?.date && !!ev.end?.date && !ev.start?.dateTime && !ev.end?.dateTime;
+          const startDate = isAllDay
+            ? parseAllDayDate(ev.start?.date)
+            : new Date(ev.start?.dateTime || ev.start?.date || new Date());
+          let endDate = isAllDay
+            ? parseAllDayDate(ev.end?.date)
+            : new Date(ev.end?.dateTime || ev.end?.date || new Date(Date.now() + 3600000));
+
+          // Google returns all-day end dates as exclusive (next day). Adjust so RBC
+          // only shows the intended day(s) without spilling into the following day.
+          if (isAllDay && endDate) {
+            const inclusiveEnd = new Date(endDate.getTime() - 1);
+            if (!isNaN(inclusiveEnd)) {
+              endDate = inclusiveEnd;
+            }
+          }
+
           const eventData = {
             id: ev.id || `event-${Math.random().toString(36).substr(2, 9)}`,
             title: ev.summary || "Untitled Event",
-            start: new Date(ev.start?.dateTime || ev.start?.date || new Date()),
-            end: new Date(ev.end?.dateTime || ev.end?.date || new Date(Date.now() + 3600000)),
-            allDay: !!ev.start?.date,
+            start: startDate,
+            end: endDate,
+            allDay: isAllDay,
             resource: {
               htmlLink: ev.htmlLink || '#',
               raw: ev // Include raw event data for debugging
@@ -103,54 +124,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     setShowCreate(true);
   }, []);
 
-  const handleSelectEvent = useCallback(async (event) => {
-    if (!token) {
-      setError("Authentication required");
-      return;
-    }
-
-    if (!event?.id) {
-      setError("Cannot delete event without an identifier");
-      return;
-    }
-
-    const eventTitle = event.title || event.summary || "this event";
-    const confirmed = window.confirm(`Delete "${eventTitle}"? This cannot be undone.`);
-    if (!confirmed) return;
-
-    setError("");
-
-    try {
-      await gcDeleteEvent(event.id, token, calendarId);
-      setEvents((prev) => prev.filter((ev) => ev.id !== event.id));
-      updateEventsForView(currentView, currentDate);
-    } catch (err) {
-      console.error("Error deleting event:", err);
-      setError(err.message || "Failed to delete event");
-    }
-  }, [token, calendarId, currentView, currentDate]);
-
-  const handleNavigate = (date, view, action) => {
-    try {
-      const nextDate = new Date(date);
-      if (isNaN(nextDate)) {
-        console.error('Invalid date after navigation:', { action, view, date });
-        return;
-      }
-
-      const targetView = view || currentView;
-      console.log('Navigation:', { action, targetView, nextDate });
-      setCurrentDate(nextDate);
-      updateEventsForView(targetView, nextDate);
-    } catch (error) {
-      console.error('Error in handleNavigate:', error);
-      const fallbackDate = new Date();
-      setCurrentDate(fallbackDate);
-      updateEventsForView(view || currentView, fallbackDate);
-    }
-  };
-
-  const updateEventsForView = (view, date) => {
+  const updateEventsForView = useCallback((view, date, options = {}) => {
     // Ensure we have a valid date
     const currentDate = new Date(date);
     if (isNaN(currentDate.getTime())) {
@@ -192,11 +166,96 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
         throw new Error(`Invalid date range calculated: start=${start}, end=${end}, view=${view}`);
       }
 
-      console.log(`Updating view: ${view}, from ${start} to ${end}`);
+      if (!options.silent) {
+        console.log(`Updating view: ${view}, from ${start} to ${end}`);
+      }
       fetchEvents(start, end);
     } catch (error) {
       console.error('Error in updateEventsForView:', error);
       setError(`Failed to update calendar view: ${error.message}`);
+    }
+  }, [fetchEvents]);
+
+  const handleSelectEvent = useCallback((event) => {
+    const raw = event?.resource?.raw || {};
+    const attendees =
+      raw.attendees?.map((att) => att.email).filter(Boolean).join(", ") || "";
+
+    setInitial({
+      id: event.id,
+      summary: event.title || raw.summary || "",
+      description: raw.description || "",
+      location: raw.location || "",
+      attendees,
+      allDay: !!event.allDay,
+      start: event.start,
+      end: event.end,
+    });
+    setShowCreate(true);
+  }, []);
+
+  const handleDeleteEvent = useCallback(async (eventId) => {
+    if (!token || !eventId) return;
+    
+    const confirmed = window.confirm('Delete this event? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setError("");
+      
+      // Delete from backend (which will delete from both database and Google Calendar)
+      await api.calendarDelete(token, eventId);
+      
+      // Remove from local state immediately
+      setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
+      
+      // Refresh events to ensure sync
+      updateEventsForView(currentView, currentDate);
+      
+      console.log(`Event ${eventId} deleted successfully`);
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      setError(err.message || "Failed to delete event. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, currentView, currentDate, updateEventsForView]);
+
+  // Handle keyboard delete (Delete or Backspace key)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only handle delete if an event is selected (modal is open)
+      if (showCreate && initial?.id && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        handleDeleteEvent(initial.id);
+        setShowCreate(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showCreate, initial, handleDeleteEvent]);
+
+  const handleNavigate = (date, view, action) => {
+    try {
+      const nextDate = new Date(date);
+      if (isNaN(nextDate)) {
+        console.error('Invalid date after navigation:', { action, view, date });
+        return;
+      }
+
+      const targetView = view || currentView;
+      console.log('Navigation:', { action, targetView, nextDate });
+      setCurrentDate(nextDate);
+      updateEventsForView(targetView, nextDate);
+    } catch (error) {
+      console.error('Error in handleNavigate:', error);
+      const fallbackDate = new Date();
+      setCurrentDate(fallbackDate);
+      updateEventsForView(view || currentView, fallbackDate);
     }
   };
 
@@ -249,7 +308,31 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
 
     // Log the current events state
     console.log('Current events state:', events);
-  }, [calendarId, token]); // Add token as a dependency
+  }, [calendarId, token, updateEventsForView]); // Add token as a dependency
+
+  // Auto-refresh when window gains focus or at intervals
+  useEffect(() => {
+    if (!token) return;
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        updateEventsForView(currentView, currentDate, { silent: true });
+      }
+    };
+    const handleFocus = () => updateEventsForView(currentView, currentDate, { silent: true });
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    const refreshMs = Number(import.meta.env.VITE_CALENDAR_REFRESH_MS || 60000);
+    const intervalId = setInterval(() => {
+      updateEventsForView(currentView, currentDate, { silent: true });
+    }, refreshMs);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+      clearInterval(intervalId);
+    };
+  }, [token, currentDate, currentView, updateEventsForView]);
 
   const CustomToolbar = (toolbar) => {
     const { label, onNavigate, onView, view } = toolbar;
@@ -319,7 +402,24 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
         onSelectEvent={handleSelectEvent}
         selectable
         components={{
-          toolbar: CustomToolbar
+          toolbar: CustomToolbar,
+          event: (props) => {
+            return (
+              <div
+                style={props.style}
+                title={props.event.title}
+                onClick={() => handleSelectEvent(props.event)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (window.confirm(`Delete "${props.event.title}"? This action cannot be undone.`)) {
+                    handleDeleteEvent(props.event.id);
+                  }
+                }}
+              >
+                {props.event.title}
+              </div>
+            );
+          }
         }}
         view={currentView}
         onView={handleView}
@@ -329,10 +429,10 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
       />
       {showCreate && (
         <ScheduleCreateModal
-          show={showCreate}
-          onHide={() => setShowCreate(false)}
-          initialValues={initial}
-          onSave={() => {
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          initial={initial}
+          onCreated={() => {
             setShowCreate(false);
             updateEventsForView(currentView, currentDate);
           }}

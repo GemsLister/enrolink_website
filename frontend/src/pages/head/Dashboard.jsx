@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/client";
-import GoogleCalendarEmbed from "../../components/GoogleCalendarEmbed";
+import CalendarGrid from "../../components/CalendarGrid";
 import ScheduleCreateModal from "../../components/ScheduleCreateModal";
 
 // Temporary circular icon placeholder used across the UI
@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [activities, setActivities] = useState([]);
   const [gcal, setGcal] = useState([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -169,6 +170,7 @@ export default function Dashboard() {
     } catch (_) {
       setGcal([]);
     }
+    setCalendarRefreshKey((prev) => prev + 1);
   }
 
   async function deleteSchedule(id) {
@@ -347,12 +349,12 @@ export default function Dashboard() {
 
           {/* Google Calendar UI */}
           <section className="mt-6">
-            <GoogleCalendarEmbed />
+            <CalendarGrid key={calendarRefreshKey} />
           </section>
-          {/* Add schedule CTA
+          {/* Add schedule CTA */}
           <div className="mt-4 flex justify-end">
             <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
-          </div> */}
+          </div>
 
           {error && (
             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
@@ -411,16 +413,6 @@ export default function Dashboard() {
           </div>
 
           {/* Removed Add Schedule box */}
-
-          {/* Google Calendar Section */}
-          <div className="mt-8">
-            <h2 className="text-sm font-bold text-[#7d102a] mb-4">
-              Interview Schedule Calendar
-            </h2>
-            <div className="bg-white rounded-xl border border-pink-200 p-5">
-              <GoogleCalendarEmbed />
-            </div>
-          </div>
 
           <div className="mt-8">
             <h2 className="text-sm font-bold text-[#7d102a]">

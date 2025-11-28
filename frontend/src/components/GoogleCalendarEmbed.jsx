@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay } from "date-fns";
+import { format, parse, startOfWeek, getDay, addHours, isSameDay } from "date-fns";
 import { enUS } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useAuth } from "../hooks/useAuth";
+import { listEvents, createEvent, updateEvent, deleteEvent } from "../lib/googleCalendar";
 
 // Set up the localizer
 const localizer = dateFnsLocalizer({
@@ -14,6 +15,16 @@ const localizer = dateFnsLocalizer({
   locales: { "en-US": enUS },
 });
 
+// Button style for toolbar
+const buttonStyle = {
+  padding: '0.5rem 1rem',
+  borderRadius: '0.25rem',
+  border: '1px solid #ccc',
+  background: 'white',
+  cursor: 'pointer',
+  fontSize: '0.875rem'
+};
+
 const GoogleCalendarEmbed = () => {
   const { token } = useAuth();
   const [events, setEvents] = useState([]);
@@ -23,6 +34,7 @@ const GoogleCalendarEmbed = () => {
   const [view, setView] = useState('week'); // 'month', 'week', 'day', 'agenda'
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Fetch events from backend
   const fetchEvents = useCallback(async (start, end) => {

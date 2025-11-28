@@ -1,7 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
-import { createEvent as gcalCreate } from '../lib/googleCalendar'
+
+const pad = (value) => String(value).padStart(2, '0')
+
+const toDateInput = (value) => {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date?.getTime?.())) return ''
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const toDateTimeInput = (value) => {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date?.getTime?.())) return ''
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 export default function ScheduleCreateModal({ open, onClose, onCreated, calendarId, initial }) {
   const { token } = useAuth()
@@ -15,18 +30,20 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
   const [calendarPick, setCalendarPick] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   if (!open) return null
 
   useEffect(() => {
     if (!open) return
+    const initialAllDay = !!initial?.allDay
     setSummary(initial?.summary || '')
     setDescription(initial?.description || '')
     setLocation(initial?.location || '')
     setAttendees(initial?.attendees || '')
-    setAllDay(!!initial?.allDay)
-    setStart(initial?.start || '')
-    setEnd(initial?.end || '')
+    setAllDay(initialAllDay)
+    setStart(initialAllDay ? toDateInput(initial?.start) : toDateTimeInput(initial?.start))
+    setEnd(initialAllDay ? toDateInput(initial?.end) : toDateTimeInput(initial?.end))
     const envCal = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'primary'
     setCalendarPick(calendarId || envCal)
   }, [open, initial, calendarId])
@@ -39,9 +56,25 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
     try {
       if (!summary) throw new Error('Title is required')
       if (!start || !end) throw new Error('Start and end are required')
+      const parseDate = (value) => {
+        if (!value) return null
+        const parsed = new Date(value)
+        return isNaN(parsed) ? null : parsed.toISOString()
+      }
+
+      const allDayStart = allDay ? start : null
+      const allDayEnd = allDay ? end : null
+
+      const startIso = allDay ? null : parseDate(start)
+      const endIso = allDay ? null : parseDate(end)
+
+      if (!allDay && (!startIso || !endIso)) {
+        throw new Error('Invalid start or end date/time')
+      }
+
       const body = allDay
-        ? { summary, description, start: { date: start }, end: { date: end } }
-        : { summary, description, start: { dateTime: start }, end: { dateTime: end } }
+        ? { summary, description, start: { date: allDayStart }, end: { date: allDayEnd } }
+        : { summary, description, start: { dateTime: startIso }, end: { dateTime: endIso } }
       // Prepare the event data with all fields
       const eventData = {
         ...body,
@@ -51,27 +84,12 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
           : undefined
       }
       
-      // backend decides calendarId when simple calendar is enabled; no need to send it
-      await api.calendarCreate(eventData, token)
-      
-      // also create in Google Calendar so it appears in the embedded UI
-      const gcid = calendarPick || import.meta.env.VITE_GOOGLE_CALENDAR_ID || undefined
-      // Fire-and-forget: do not block the modal on Google consent or network
-      ;(() => {
-        const attendeeList = String(attendees || '')
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-          .map(email => ({ email }))
-        const googleEvent = {
-          ...body,
-          location: location || undefined,
-          attendees: attendeeList.length ? attendeeList : undefined,
-        }
-        gcalCreate(googleEvent, { calendarId: gcid }).catch(err => {
-          console.warn('Google Calendar create failed:', err)
-        })
-      })()
+      const isEditing = Boolean(initial?.id)
+      if (isEditing) {
+        await api.calendarUpdate(initial.id, eventData, token)
+      } else {
+        await api.calendarCreate(eventData, token)
+      }
       setSummary('')
       setDescription('')
       setLocation('')
@@ -88,25 +106,39 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
     }
   }
 
+  async function handleDelete() {
+    if (!token || !initial?.id) return
+    const confirmed = window.confirm('Delete this schedule? This action cannot be undone.')
+    if (!confirmed) return
+    try {
+      setDeleteLoading(true)
+      setError('')
+      // Delete from backend (which deletes from both database and Google Calendar)
+      await api.calendarDelete(token, initial.id)
+      console.log(`Event ${initial.id} deleted successfully from database and Google Calendar`)
+      onCreated?.() // Refresh the calendar
+      onClose?.()
+    } catch (err) {
+      console.error('Error deleting event:', err)
+      setError(err.message || 'Failed to delete schedule')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_18px_36px_rgba(0,0,0,0.12)] border border-[#efccd2]">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[#7d102a]">Add Schedule</h3>
+          <h3 className="text-sm font-bold text-[#7d102a]">{initial?.id ? 'Edit Schedule' : 'Add Schedule'}</h3>
           <button onClick={onClose} className="text-[#7d102a] hover:opacity-70" aria-label="Close">✕</button>
         </div>
         <form onSubmit={onSubmit} className="mt-3 space-y-3">
           {error && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{error}</div>}
           <input type="text" placeholder="Student name" value={summary} onChange={(e)=>setSummary(e.target.value)} className="w-full h-9 rounded-md bg-white px-3 text-[13px] text-[#2f2b33] placeholder:text-[#8c7f86] outline-none focus:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]" />
           
-          <div className="grid grid-cols-1 gap-2">
-            <label className="block text-[12px] text-[#7d102a] mb-1">Calendar</label>
-            <select value={calendarPick} onChange={(e)=>setCalendarPick(e.target.value)} className="h-9 rounded-md bg-white px-3 text-[13px] text-[#2f2b33] outline-none focus:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]">
-              <option value="primary">Primary</option>
-              {import.meta.env.VITE_GOOGLE_CALENDAR_ID && <option value={import.meta.env.VITE_GOOGLE_CALENDAR_ID}>{import.meta.env.VITE_GOOGLE_CALENDAR_ID}</option>}
-            </select>
-          </div>
+          <input type="hidden" value={calendarPick} readOnly />
           <label className="flex items-center gap-2 text-[13px] text-[#7d102a]">
             <input 
               type="checkbox" 
@@ -155,9 +187,23 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
               />
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="h-9 rounded-md bg-white text-[#7d102a] text-[13px] font-semibold border border-[#efccd2] px-3">Cancel</button>
-            <button type="submit" disabled={loading} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold disabled:opacity-50 px-3">{loading ? 'Saving…' : 'Save'}</button>
+          <div className="flex items-center justify-between gap-2 pt-1">
+            {initial?.id ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="h-9 rounded-md bg-white text-red-600 text-[13px] font-semibold border border-red-200 px-3 disabled:opacity-50"
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete'}
+              </button>
+            ) : <span />}
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onClose} className="h-9 rounded-md bg-white text-[#7d102a] text-[13px] font-semibold border border-[#efccd2] px-3">Cancel</button>
+              <button type="submit" disabled={loading} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold disabled:opacity-50 px-3">
+                {loading ? 'Saving…' : (initial?.id ? 'Update' : 'Save')}
+              </button>
+            </div>
           </div>
         </form>
       </div>

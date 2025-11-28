@@ -54,6 +54,9 @@ export default function OfficerDashboard() {
   const [activities, setActivities] = useState([])
   const [gcal, setGcal] = useState([])
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState([])
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -119,6 +122,14 @@ export default function OfficerDashboard() {
     return () => { alive = false }
   }, [token])
 
+  useEffect(() => {
+    if (!gcal.length && selectedScheduleIds.length) {
+      setSelectedScheduleIds([])
+      return
+    }
+    setSelectedScheduleIds((prev) => prev.filter((id) => gcal.some((ev) => ev.id === id)))
+  }, [gcal])
+
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
 
@@ -154,16 +165,63 @@ export default function OfficerDashboard() {
     } catch (_) {
       setGcal([])
     }
+    setCalendarRefreshKey((prev) => prev + 1)
   }
 
   async function deleteSchedule(id) {
     if (!token || !id) return
     try {
       await api.calendarDelete(token, id)
+      setSelectedScheduleIds((prev) => prev.filter((item) => item !== id))
       await refreshCalendar()
     } catch (e) {
       setError(e.message || 'Failed to delete schedule')
     }
+  }
+
+  async function deleteSelectedSchedules() {
+    if (!token || !selectedScheduleIds.length) return
+    const confirmed = window.confirm(`Delete ${selectedScheduleIds.length} selected schedule${selectedScheduleIds.length > 1 ? 's' : ''}? This cannot be undone.`)
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    setError('')
+    try {
+      await Promise.all(
+        selectedScheduleIds.map((id) =>
+          api.calendarDelete(token, id).catch((err) => {
+            console.error('Failed to delete schedule', id, err)
+            throw err
+          })
+        )
+      )
+      setSelectedScheduleIds([])
+      await refreshCalendar()
+    } catch (err) {
+      console.error('Bulk delete failed:', err)
+      setError(err.message || 'Failed to delete selected schedules')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const allSchedulesSelected = gcal.length > 0 && selectedScheduleIds.length === gcal.length
+
+  const toggleSelectAllSchedules = () => {
+    if (allSchedulesSelected) {
+      setSelectedScheduleIds([])
+    } else {
+      setSelectedScheduleIds(gcal.map((ev) => ev.id))
+    }
+  }
+
+  const toggleScheduleSelection = (id) => {
+    setSelectedScheduleIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id)
+      }
+      return [...prev, id]
+    })
   }
 
   return (
@@ -228,7 +286,7 @@ export default function OfficerDashboard() {
           </section>
           {/* Google Calendar UI */}
           <section className="mt-6">
-            <CalendarGrid />
+            <CalendarGrid key={calendarRefreshKey} />
           </section>
           {/* Add schedule CTA */}
           <div className="mt-4 flex justify-end">
@@ -267,15 +325,52 @@ export default function OfficerDashboard() {
           </div>
           {/* Removed Add Schedule box */}
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-[#7d102a]">Schedules</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Schedules</h2>
+              <div className="flex items-center gap-2">
+                {selectedScheduleIds.length > 0 && (
+                  <span className="text-xs text-[#7d102a] font-semibold">
+                    {selectedScheduleIds.length} selected
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleSelectAllSchedules}
+                  disabled={!gcal.length}
+                  className={`text-xs font-semibold px-3 py-1 rounded-full border ${
+                    allSchedulesSelected
+                      ? 'bg-[#8a1d35] text-white border-[#8a1d35]'
+                      : 'border-[#efccd2] text-[#7d102a] hover:bg-[#f8e7eb]'
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  {allSchedulesSelected ? 'Clear selection' : 'Select all'}
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelectedSchedules}
+                  disabled={!selectedScheduleIds.length || bulkDeleting}
+                  className="text-xs font-semibold px-3 py-1 rounded-full border border-[#efccd2] text-white bg-[#b0475c] hover:bg-[#8a1d35] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {bulkDeleting ? 'Deleting…' : 'Delete selected'}
+                </button>
+              </div>
+            </div>
             <div className="mt-4 flex flex-col gap-3 pr-2 max-h-[320px] overflow-y-auto">
               {gcal.length === 0 && (<div className="text-sm text-[#a86a74]">No schedules.</div>)}
               {gcal.map(ev => {
                 const when = ev.start?.dateTime || ev.start?.date
                 const dt = when ? new Date(when) : null
+                const isSelected = selectedScheduleIds.includes(ev.id)
                 return (
                   <div key={ev.id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(139,23,47,0.08)] border border-[#efccd2]">
                     <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[#8a1d35]"
+                        checked={isSelected}
+                        onChange={() => toggleScheduleSelection(ev.id)}
+                        aria-label={`Select ${ev.summary || 'schedule'}`}
+                      />
                       <div className="flex items-center justify-center rounded-full font-semibold uppercase tracking-[0.2em] text-[10px] w-12 h-12 bg-white text-[#b0475c] border border-[#efccd2]">icon</div>
                       <div className="text-sm leading-relaxed text-[#7d102a]">
                         <p className="font-semibold">{ev.summary || 'Untitled Event'}</p>
