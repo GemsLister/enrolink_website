@@ -4,6 +4,7 @@ import OfficerSidebar from '../../components/OfficerSidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { api } from '../../api/client'
 import CalendarGrid from '../../components/CalendarGrid'
+import QuickChart from '../../components/QuickChart'
 import ScheduleCreateModal from '../../components/ScheduleCreateModal'
 
 function PlaceholderIcon({ size = 'w-11 h-11', variant = 'primary', label = 'icon' }) {
@@ -251,22 +252,33 @@ export default function OfficerDashboard() {
           </section>
           <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
-              <div className="mt-5 space-y-3">
-                {batches.length === 0 && (<div className="text-sm text-[#a86a74]">No data for the selected school year.</div>)}
-                {batches.map((batch) => {
-                  const max = Math.max(...batches.map(b => b.count ?? b.value ?? 0), 1)
-                  const count = batch.count ?? batch.value ?? 0
-                  const pct = Math.round((count / max) * 100)
-                  return (
-                    <div key={batch.code || batch.name} className="flex items-center gap-3">
-                      <span className="w-[64px] text-[12px] font-semibold text-[#7d102a]">{batch.code || batch.name}</span>
-                      <div className="flex-1 h-3 rounded-full bg-[#f0dce0] overflow-hidden"><div className="h-full rounded-full bg-[#8a1d35]" style={{ width: `${pct}%` }} /></div>
-                      <span className="w-9 text-right text-[12px] font-semibold text-[#7d102a]">{count}</span>
-                    </div>
-                  )
-                })}
-              </div>
+              <h2 className="text-sm font-bold text-[#7d102a]">Counts: Pass vs Fail</h2>
+              {(() => {
+                const base = totals.interviewed || totals.totalApplicants || 0
+                const rows = [
+                  { label: 'Failed', value: Math.max(0, base - Number(totals.passedInterview || 0)), color: '#7d102a' },
+                  { label: 'Passed', value: Number(totals.passedInterview || 0), color: '#f4c3ce' },
+                ]
+                if (!base) return (<div className="mt-5 text-sm text-[#a86a74]">No data for the selected school year.</div>)
+                return (
+                  <div className="mt-4 flex flex-col gap-3">
+                    {rows.map((r) => {
+                      const pct = Math.max(0, Math.min(100, Math.round((r.value / base) * 100)))
+                      return (
+                        <div key={r.label} className="grid grid-cols-[1fr_80px] items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="w-20 text-sm text-[#7d102a]">{r.label}</span>
+                            <div className="flex-1 h-4 rounded-full bg-[#f2f4f7]">
+                              <div className="h-4 rounded-full" style={{ width: `${pct}%`, background: r.color }} />
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-[#7d102a] font-semibold">{r.value}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
               <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>

@@ -11,6 +11,7 @@ import BatchManagement from './pages/head/batchmanagement'
 import EnrollmentOfficers from './pages/head/enrollmentofficers'
 import Reports from './pages/head/reports'
 import HeadSettings from './pages/head/settings'
+import BatchPage from './pages/head/batch'
 import ArchivePage from './pages/head/archive'
 import OfficerDashboard from './pages/officer/Dashboard'
 import OfficerStudentRecords, { OfficerRecordsOverview } from './pages/officer/studentrecords'
@@ -41,6 +42,7 @@ function App() {
       <Route path="/head/records/archive" element={<StudentRecords view="archive" />} />
       <Route path="/head/student-records" element={<Navigate to="/head/records/applicants" replace />} />
       <Route path="/head/batch-management" element={<BatchManagement />} />
+      <Route path="/head/batches/:id" element={<BatchPage />} />
       <Route path="/head/enrollment-officers" element={<EnrollmentOfficers />} />
       <Route path="/head/reports" element={<Reports />} />
       <Route path="/head/settings" element={<HeadSettings />} />

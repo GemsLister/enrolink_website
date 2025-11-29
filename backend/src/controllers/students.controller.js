@@ -46,7 +46,10 @@ export async function upsert(req, res, next) {
       const filter = { _id: id };
       if (__v !== undefined) filter.__v = __v;
       if (nameSignature) {
-        const duplicate = await Student.findOne({ nameSignature, _id: { $ne: id } }).lean();
+        const dupFilter = { nameSignature };
+        if (data.batchId) dupFilter.batchId = data.batchId;
+        else if (data.batch) dupFilter.batch = data.batch;
+        const duplicate = await Student.findOne({ ...dupFilter, _id: { $ne: id } }).lean();
         if (duplicate) {
           return res.status(409).json({ error: 'A record with the same full name already exists.' });
         }
@@ -59,7 +62,10 @@ export async function upsert(req, res, next) {
       return res.json({ doc });
     }
     if (nameSignature) {
-      const duplicate = await Student.findOne({ nameSignature }).lean();
+      const dupFilter = { nameSignature };
+      if (data.batchId) dupFilter.batchId = data.batchId;
+      else if (data.batch) dupFilter.batch = data.batch;
+      const duplicate = await Student.findOne(dupFilter).lean();
       if (duplicate) {
         return res.status(409).json({ error: 'A record with the same full name already exists.' });
       }

@@ -65,7 +65,11 @@ export default function BatchesTable({
           {batchesLoading && (<tr><td colSpan={6} className="px-6 py-6 text-center text-gray-600">Loading batches…</td></tr>)}
           {!batchesLoading && displayedBatches.length === 0 && (<tr><td colSpan={6} className="px-6 py-10 text-center text-gray-600">No batches found</td></tr>)}
           {!batchesLoading && displayedBatches.map((batch, index) => (
-            <tr key={batch.id} className={`border-b border-gray-100 hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+            <tr
+              key={batch.id}
+              className={`border-b border-gray-100 hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} cursor-pointer`}
+              onClick={() => handleRowClick(batch)}
+            >
               <td className="px-6 py-4">
                 <input type="checkbox" className="rounded border-gray-300" checked={selectedIds.has(batch.id)} onChange={(e) => toggleRow(batch.id, e.target.checked)} onClick={(e) => e.stopPropagation()} />
               </td>

@@ -1,4 +1,5 @@
-import { Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { getStatusBadge } from '../../utils/status'
@@ -11,6 +12,8 @@ import BatchDetailsModal from './components/BatchDetailsModal'
 
 export default function BatchManagement({ embedded = false }) {
     const { isAuthenticated, user, token } = useAuth()
+    const navigate = useNavigate()
+    const { id: routeBatchId } = useParams()
   const {
       batches, batchesLoading, query,
       filterBatch, filterStatus, filterInterviewer,
@@ -34,8 +37,20 @@ export default function BatchManagement({ embedded = false }) {
       updateBatchStatus,
       setQuery, setFilterBatch, setFilterStatus, setFilterInterviewer, setSortField, setSortDir,
   } = useBatchManagement(token, { allowInterviewer: user?.role === 'DEPT_HEAD' })
-    if (!isAuthenticated) return <Navigate to="/login" replace />
-    if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
+
+    // Auto-open the selected batch when routed to /head/batch-management/:id
+    // and show members by default for quick adding
+    useEffect(() => {
+      if (routeBatchId && batches && batches.length) {
+        const b = batches.find(x => x.id === routeBatchId)
+        if (b) {
+          handleRowClick(b)
+          setShowMembers(true)
+        }
+      }
+    }, [routeBatchId, batches])
 
     const content = (
       <>
@@ -80,7 +95,7 @@ export default function BatchManagement({ embedded = false }) {
                   toggleAllDisplayed={toggleAllDisplayed}
                   selectedIds={selectedIds}
                   toggleRow={toggleRow}
-                  handleRowClick={handleRowClick}
+                  handleRowClick={(b) => navigate(`/head/batches/${b.id}`)}
                   sortField={sortField}
                   sortDir={sortDir}
                   onHeaderSort={(field) => {
@@ -117,7 +132,7 @@ export default function BatchManagement({ embedded = false }) {
             <BatchDetailsModal
               isOpen={isModalOpen}
               selectedBatch={selectedBatch}
-              closeModal={closeModal}
+              closeModal={() => { closeModal(); if (routeBatchId) navigate('/head/batch-management') }}
               showMembers={showMembers}
               setShowMembers={setShowMembers}
               members={members}
@@ -141,5 +156,5 @@ export default function BatchManagement({ embedded = false }) {
         <Sidebar />
         {content}
       </div>
-    )
+  )
 }

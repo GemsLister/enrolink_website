@@ -110,55 +110,57 @@ export default function OfficerReports() {
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
 
   return (
-    <div className="flex">
-      <OfficerSidebar />
-      <main className="flex-1 bg-gray-50 px-8 pt-8 pb-4 overflow-y-auto h-[100dvh]">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-5xl font-bold text-red-900 mb-2 mt-[35px]">REPORTS</h1>
-            <p className="text-lg text-gray-1000 font-bold mt-[20px]">Interview Results and Exam Scores</p>
+    <div className="min-h-screen flex bg-white">
+      <aside className="w-80 shrink-0">
+        <OfficerSidebar />
+      </aside>
+      <main className="flex-1 bg-[#fff6f7] px-10 pt-12 pb-10 overflow-y-auto">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <p className="uppercase tracking-[0.4em] text-sm text-rose-400">Records</p>
+            <h1 className="text-4xl font-semibold text-[#5b1a30]">Reports</h1>
+            <p className="text-sm text-[#8b4a5d]">Interview Results and Exam Scores</p>
           </div>
-
-          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 mt-[-50px] border-2 border-[#6b2b2b]">
+          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b] shadow-[0_14px_28px_rgba(139,23,47,0.08)]">
             <button onClick={onDownloadPdf} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 font-medium text-sm">Download PDF</button>
             <button onClick={onPrint} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Print</button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-center mb-4">
-          <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search name / score / result / batch" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-64" />
-          <input value={batch} onChange={(e)=>setBatch(e.target.value)} placeholder="Filter by batch (YYYY)" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-48" />
+        <div className="mt-6 flex flex-wrap gap-3 items-center">
+          <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search name / score / result / batch" className="bg-white border border-rose-200 rounded-full px-4 py-2 text-sm text-[#4b1d2d] w-64 focus:border-rose-400 focus:outline-none" />
+          <input value={batch} onChange={(e)=>setBatch(e.target.value)} placeholder="Filter by batch (YYYY)" className="bg-white border border-rose-200 rounded-full px-4 py-2 text-sm text-[#4b1d2d] w-48 focus:border-rose-400 focus:outline-none" />
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
 
-        <div className="bg-white rounded-xl border border-pink-200 overflow-auto">
+        <div className="mt-6 bg-white rounded-2xl border border-rose-200 overflow-auto shadow-[0_12px_24px_rgba(139,23,47,0.08)]">
           <table className="min-w-[720px] w-full text-sm">
-            <thead className="bg-pink-50 text-gray-700 print:bg-white">
+            <thead className="bg-rose-50 text-[#4b1d2d]">
               <tr className="text-left">
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='name' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'name')))}>Student Name</th>
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='batch' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'batch')))}>Batch</th>
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='officer' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'officer')))}>Enrollment Officer</th>
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='date' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'date')))}>Interview Date</th>
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='result' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'result')))}>Interview Result</th>
-                <th className="px-4 py-2 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='score' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'score')))}>Exam Score</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='name' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'name')))}>Student Name</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='batch' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'batch')))}>Batch</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='officer' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'officer')))}>Enrollment Officer</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='date' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'date')))}>Interview Date</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='result' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'result')))}>Interview Result</th>
+                <th className="px-5 py-3 cursor-pointer select-none" onClick={() => setSortField(prev => (prev==='score' ? (setSortDir(d=>d==='asc'?'desc':'asc'), prev) : (setSortDir('asc'), 'score')))}>Exam Score</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-4 text-center">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-5 py-4 text-center">Loading…</td></tr>
               ) : filtered.length ? (
                 displayed.map((r, idx) => (
-                  <tr key={r.id || idx} className="border-t border-pink-100">
-                    <td className="px-4 py-2 text-gray-800">{r.name}</td>
-                    <td className="px-4 py-2 text-gray-800">{r.batch}</td>
-                    <td className="px-4 py-2 text-gray-800">{r.interviewer}</td>
-                    <td className="px-4 py-2 text-gray-800">{r.date}</td>
-                    <td className="px-4 py-2"><span className={getStatusBadge(toUiStatus(r.result || ''))}>{toUiStatus(r.result || '')}</span></td>
-                    <td className="px-4 py-2 text-gray-800">{r.examScore ?? '-'}</td>
+                  <tr key={r.id || idx} className="border-t border-rose-100">
+                    <td className="px-5 py-3 text-[#4b1d2d]">{r.name}</td>
+                    <td className="px-5 py-3 text-[#4b1d2d]">{r.batch}</td>
+                    <td className="px-5 py-3 text-[#4b1d2d]">{r.interviewer}</td>
+                    <td className="px-5 py-3 text-[#4b1d2d]">{r.date}</td>
+                    <td className="px-5 py-3"><span className={getStatusBadge(toUiStatus(r.result || ''))}>{toUiStatus(r.result || '')}</span></td>
+                    <td className="px-5 py-3 text-[#4b1d2d]">{r.examScore ?? '-'}</td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={6} className="px-4 py-4 text-center text-gray-600">No data</td></tr>
+                <tr><td colSpan={6} className="px-5 py-4 text-center text-[#7c3a4a]">No data</td></tr>
               )}
             </tbody>
           </table>

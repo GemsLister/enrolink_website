@@ -364,6 +364,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
       }
     };
   
+    const showSyncBtn = String(import.meta.env.VITE_ENABLE_CALENDAR_SYNC_BUTTON || '').toLowerCase() === 'true'
     return (
       <div className="rbc-toolbar p-5">
         <div className="rbc-btn-group" style={{ marginRight: 'auto' }}>
@@ -403,14 +404,16 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
-          <button
-            type="button"
-            className="rbc-btn"
-            onClick={handleSync}
-            style={{ marginLeft: '8px' }}
-          >
-            Sync to Google
-          </button>
+          {showSyncBtn && (
+            <button
+              type="button"
+              className="rbc-btn"
+              onClick={handleSync}
+              style={{ marginLeft: '8px' }}
+            >
+              Sync to Google
+            </button>
+          )}
         </div>
       </div>
     );

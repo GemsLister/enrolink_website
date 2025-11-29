@@ -1,12 +1,22 @@
 import { getStudentModel } from '../models/Student.js';
 import { getBatchModel } from '../models/Batch.js';
+import { getInterviewModel } from '../models/Interview.js';
+import { statsFromBigQuery } from '../services/google/bigquery.js';
 
 export async function stats(req, res, next) {
   try {
+    const useBq = false;
+    const year = req.query.year ? String(req.query.year) : '';
+
+    if (false) {
+      const data = await statsFromBigQuery(year);
+      return res.json(data);
+    }
+
     const Student = getStudentModel();
     const Batch = getBatchModel();
+    const Interview = getInterviewModel();
 
-    const year = req.query.year ? String(req.query.year) : '';
     let batchIds = undefined;
     if (year) {
       const batchesOfYear = await Batch.find({ year }).select('_id code index').lean();
@@ -21,10 +31,16 @@ export async function stats(req, res, next) {
       : {};
 
     const total = await Student.countDocuments(match);
-    const interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
-    const passed = await Student.countDocuments({ ...match, status: 'PASSED' });
+    let interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    let passed = await Student.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
     const enrolled = await Student.countDocuments({ ...match, status: 'ENROLLED' });
     const awol = await Student.countDocuments({ ...match, status: 'AWOL' });
+
+    const ivFilter = year ? { batch: year } : {};
+    const interviewedFromIv = await Interview.countDocuments(ivFilter);
+    const passedFromIv = await Interview.countDocuments({ ...ivFilter, result: 'PASSED' });
+    interviewed = Math.max(interviewed, interviewedFromIv);
+    passed = Math.max(passed, passedFromIv);
 
     // Batch analytics: count students per batch for selected year
     let batchAnalytics = [];
@@ -42,7 +58,17 @@ export async function stats(req, res, next) {
       batchAnalytics = batches.map(b => ({ code: b.code, count: countsMap.get(String(b._id)) || 0 }));
     }
 
-    res.json({ totals: { totalApplicants: total, interviewed, passedInterview: passed, enrolled, awol }, batchAnalytics });
+    const base = interviewed || total || 0;
+    const pie = [
+      ['Result', 'Percent'],
+      ['Failed', base ? Math.max(0, 100 - Math.min(100, Math.round((passed / base) * 100))) : 100],
+      ['Passed', base ? Math.min(100, Math.round((passed / base) * 100)) : 0],
+    ];
+    const column = [
+      ['Batch', 'Count'],
+      ...batchAnalytics.map(b => [String(b.code || ''), Number(b.count || 0)]),
+    ];
+    res.json({ totals: { totalApplicants: total, interviewed, passedInterview: passed, enrolled, awol }, batchAnalytics, charts: { passRatePie: pie, batchesColumn: column } });
   } catch (e) { next(e); }
 }
 
@@ -97,6 +123,7 @@ export async function pushGa(req, res, next) {
   try {
     const Student = getStudentModel();
     const Batch = getBatchModel();
+    const Interview = getInterviewModel();
     const measurementId = process.env.GA_MEASUREMENT_ID;
     const apiSecret = process.env.GA_API_SECRET;
     if (!measurementId || !apiSecret) {
@@ -114,10 +141,16 @@ export async function pushGa(req, res, next) {
           : { batch: year })
       : {};
     const total = await Student.countDocuments(match);
-    const interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
-    const passed = await Student.countDocuments({ ...match, status: 'PASSED' });
+    let interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    let passed = await Student.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
     const enrolled = await Student.countDocuments({ ...match, status: 'ENROLLED' });
     const awol = await Student.countDocuments({ ...match, status: 'AWOL' });
+
+    const ivFilter = year ? { batch: year } : {};
+    const interviewedFromIv = await Interview.countDocuments(ivFilter);
+    const passedFromIv = await Interview.countDocuments({ ...ivFilter, result: 'PASSED' });
+    interviewed = Math.max(interviewed, interviewedFromIv);
+    passed = Math.max(passed, passedFromIv);
     let batchAnalytics = [];
     if (batchIds && batchIds.length) {
       const counts = await Student.aggregate([

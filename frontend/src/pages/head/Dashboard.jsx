@@ -4,6 +4,7 @@ import Sidebar from "../../components/Sidebar";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/client";
 import CalendarGrid from "../../components/CalendarGrid";
+import QuickChart from "../../components/QuickChart";
 import ScheduleCreateModal from "../../components/ScheduleCreateModal";
 
 // Temporary circular icon placeholder used across the UI
@@ -216,6 +217,11 @@ export default function Dashboard() {
   ];
 
   const batches = stats.batchAnalytics || [];
+  const avgBatchCount = useMemo(() => {
+    const arr = batches.map(b => Number(b.count ?? b.value ?? 0));
+    if (!arr.length) return 0;
+    return Math.round(arr.reduce((a, c) => a + c, 0) / arr.length);
+  }, [batches]);
 
   const passRate = useMemo(() => {
     const base = totals.interviewed || totals.totalApplicants || 0;
@@ -286,81 +292,79 @@ export default function Dashboard() {
 
           {/* Analytics panels */}
           <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {/* Batch Analytics */}
+            {/* Pass/Fail Counts (Bar) */}
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">
-                Batch Analytics
-              </h2>
-              <div className="mt-5 space-y-3">
-                {batches.length === 0 && (
-                  <div className="text-sm text-[#a86a74]">
-                    No data for the selected school year.
+              <h2 className="text-sm font-bold text-[#7d102a]">Counts: Pass vs Fail</h2>
+              {(() => {
+                const base = totals.interviewed || totals.totalApplicants || 0
+                const rows = [
+                  { label: 'Failed', value: Math.max(0, base - Number(totals.passedInterview || 0)), color: '#7d102a' },
+                  { label: 'Passed', value: Number(totals.passedInterview || 0), color: '#f4c3ce' },
+                ]
+                if (!base) return (<div className="mt-5 text-sm text-[#a86a74]">No data for the selected school year.</div>)
+                return (
+                  <div className="mt-4 flex flex-col gap-3">
+                    {rows.map((r) => {
+                      const pct = Math.max(0, Math.min(100, Math.round((r.value / base) * 100)))
+                      return (
+                        <div key={r.label} className="grid grid-cols-[1fr_80px] items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="w-20 text-sm text-[#7d102a]">{r.label}</span>
+                            <div className="flex-1 h-4 rounded-full bg-[#f2f4f7]">
+                              <div className="h-4 rounded-full" style={{ width: `${pct}%`, background: r.color }} />
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-[#7d102a] font-semibold">{r.value}</div>
+                        </div>
+                      )
+                    })}
                   </div>
-                )}
-                {batches.map((batch) => {
-                  const max = Math.max(
-                    ...batches.map((b) => b.count ?? b.value ?? 0),
-                    1
-                  );
-                  const count = batch.count ?? batch.value ?? 0;
-                  const pct = Math.round((count / max) * 100);
-                  return (
-                    <div
-                      key={batch.code || batch.name}
-                      className="flex items-center gap-3"
-                    >
-                      <span className="w-[64px] text-[12px] font-semibold text-[#7d102a]">
-                        {batch.code || batch.name}
-                      </span>
-                      <div className="flex-1 h-3 rounded-full bg-[#f0dce0] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[#8a1d35]"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="w-9 text-right text-[12px] font-semibold text-[#7d102a]">
-                        {count}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                )
+              })()}
             </div>
 
             {/* Pass Rate Donut */}
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">
-                Percentage: Pass Rates
-              </h2>
-              <div className="mt-6 flex flex-col items-center gap-5">
-                <div
-                  className="relative flex items-center justify-center rounded-full"
-                  style={{
-                    width: "220px",
-                    height: "220px",
-                    background: `conic-gradient(#7d102a 0% ${passRate.failed}%, #f4c3ce ${passRate.failed}% 100%)`,
-                  }}
-                >
-                  <div className="absolute flex h-[150px] w-[150px] flex-col items-center justify-center rounded-full bg-white text-center border border-[#efccd2]">
-                    <span className="text-4xl font-extrabold text-[#7d102a]">
-                      {passRate.passed}%
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-[#a86a74]">
-                      Passed
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 text-sm text-[#7d102a]">
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full bg-[#7d102a]" />
-                    <span>Failed {passRate.failed}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full bg-[#f4c3ce]" />
-                    <span>Passed {passRate.passed}%</span>
-                  </div>
-                </div>
-              </div>
+              <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+              <QuickChart
+                type="PieChart"
+                className="mt-4"
+                style={{ width: '100%', height: 280 }}
+                data={[["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)]]}
+                options={{
+                  backgroundColor: 'transparent',
+                  pieSliceText: 'percentage',
+                  legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                  slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
+                  chartArea: { width: '80%', height: '70%' },
+                  tooltip: { trigger: 'focus' },
+                  animation: { startup: true, duration: 500, easing: 'out' },
+                }}
+              />
+            </div>
+          </section>
+
+          {/* Batch Analytics (Horizontal Bar) */}
+          <section className="mt-6 grid grid-cols-1">
+            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+              <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
+              {(() => {
+                const rows = (batches && batches.length ? batches : FALLBACK_BATCHES).map((b) => [String(b.code || b.label || '—'), Number(b.count ?? b.value ?? 0)])
+                const data = [["Batch", "Count"], ...rows]
+                return (
+                  <QuickChart
+                    type="BarChart"
+                    className="mt-4"
+                    style={{ width: '100%', height: 280 }}
+                    data={data}
+                    options={{
+                      backgroundColor: 'transparent',
+                      legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                      slices: { 0: { color: '#7d102a' } },
+                    }}
+                  />
+                )
+              })()}
             </div>
           </section>
 
