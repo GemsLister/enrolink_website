@@ -21,7 +21,9 @@
     "react-google-recaptcha": "^3.1.0",
     "react-router-dom": "^7.9.6",
     "tailwindcss": "^4.1.17",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

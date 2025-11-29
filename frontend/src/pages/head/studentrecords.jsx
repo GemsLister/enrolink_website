@@ -153,15 +153,15 @@ const EMPTY_RECORD = ALL_COLUMN_KEYS.reduce((acc, key) => {
 const VIEW_META = {
   enrollees: {
     title: 'Enrollee Records',
-    subtitle: 'Complete list of enrollees for the selected intake.',
+    subtitle: 'List of First Year Enrollees.',
   },
   applicants: {
     title: 'Applicant Records',
-    subtitle: 'Spacious, editable view of every applicant in the pipeline.',
+    subtitle: 'List of First Year Applicants.',
   },
   students: {
     title: 'Student Records',
-    subtitle: 'Historical view of admitted students with their profiles.',
+    subtitle: 'List of First Year Students.',
   },
 }
 
@@ -382,6 +382,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const fileInputRef = useRef(null)
   const editingRowRef = useRef(null)
   const rowsRef = useRef([])
+  const tableScrollRef = useRef(null)
+  const lastScrollPosRef = useRef({ left: 0, top: 0 })
+  const restoreScroll = useCallback(() => {
+    const el = tableScrollRef.current
+    if (!el) return
+    const maxLeft = Math.max(0, (el.scrollWidth || 0) - (el.clientWidth || 0))
+    const maxTop = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0))
+    const desiredLeft = Math.max(0, Math.min(lastScrollPosRef.current.left || 0, maxLeft))
+    const desiredTop = Math.max(0, Math.min(lastScrollPosRef.current.top || 0, maxTop))
+    el.scrollLeft = desiredLeft
+    el.scrollTop = desiredTop
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(() => {
+        if (!tableScrollRef.current) return
+        tableScrollRef.current.scrollLeft = desiredLeft
+        tableScrollRef.current.scrollTop = desiredTop
+      })
+    }
+    setTimeout(() => {
+      if (!tableScrollRef.current) return
+      tableScrollRef.current.scrollLeft = desiredLeft
+      tableScrollRef.current.scrollTop = desiredTop
+    }, 0)
+  }, [])
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -396,6 +420,14 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const sortMenuRefs = useRef({})
   const [showFormatModal, setShowFormatModal] = useState(false)
   const [archiveType, setArchiveType] = useState('enrollees')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportSelected, setExportSelected] = useState([])
+  const [exportScope, setExportScope] = useState('filtered')
+  const [exportOrientation, setExportOrientation] = useState('landscape')
+  const [exportPaperSize, setExportPaperSize] = useState('A4')
+  const [selectedRows, setSelectedRows] = useState([])
+  
 
   const isArchiveView = view === 'archive'
   const currentCategory = isArchiveView ? VIEW_TO_CATEGORY[archiveType] : (VIEW_TO_CATEGORY[view] || 'Applicant')
@@ -422,6 +454,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     () => CARD_DEFS.map((card) => ({ key: card.key, label: card.title, href: `${basePath}/${card.key}` })),
     [basePath]
   )
+  const exportableColumns = useMemo(() => columns.filter((c) => c.key !== 'actions'), [columns])
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -652,7 +685,45 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     [sortConfigs]
   )
 
-  const sortedRows = useMemo(() => applySort(rows), [rows, applySort])
+  const filteredRows = useMemo(() => {
+    const q = String(searchQuery || '').trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((row) => {
+      const first = String(normalizeText(row.firstName, 'name') || '').toLowerCase()
+      const middle = String(normalizeText(row.middleName, 'name') || '').toLowerCase()
+      const last = String(normalizeText(row.lastName, 'name') || '').toLowerCase()
+      const candidates = [
+        first,
+        middle,
+        last,
+        [last, first, middle].filter(Boolean).join(' '),
+        [first, middle, last].filter(Boolean).join(' '),
+        [first, last].filter(Boolean).join(' '),
+        [last, first].filter(Boolean).join(' '),
+      ]
+      return candidates.some((c) => c && c.includes(q))
+    })
+  }, [rows, searchQuery])
+
+  const sortedRows = useMemo(() => applySort(filteredRows), [filteredRows, applySort])
+
+  const getRowId = (row) => row._id || row.__clientId || ''
+  const allVisibleSelected = useMemo(() => {
+    const ids = sortedRows.map(getRowId).filter(Boolean)
+    if (!ids.length) return false
+    const set = new Set(selectedRows)
+    return ids.every((id) => set.has(id))
+  }, [sortedRows, selectedRows])
+  const toggleRowSelect = (row) => {
+    const id = getRowId(row)
+    if (!id) return
+    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+  const selectAllVisible = () => {
+    const ids = sortedRows.map(getRowId).filter(Boolean)
+    setSelectedRows(ids)
+  }
+  const clearSelection = () => setSelectedRows([])
 
   const cancelEditing = useCallback(() => {
     if (!editingId) return
@@ -662,11 +733,19 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     setEditingId(null)
     setEditingMeta(null)
     setEditingValues(EMPTY_RECORD)
+    restoreScroll()
   }, [editingId, editingMeta])
 
   const beginEditing = useCallback((row, meta = {}) => {
     const identifier = row._id || row.__clientId
     if (!identifier) return
+    if (row.archived_at || isArchiveView) return
+    if (tableScrollRef.current) {
+      lastScrollPosRef.current = {
+        left: tableScrollRef.current.scrollLeft || 0,
+        top: tableScrollRef.current.scrollTop || 0,
+      }
+    }
     setEditingId(identifier)
     const values = {}
     ALL_COLUMN_KEYS.forEach((key) => {
@@ -699,6 +778,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               await api.post('/students', payload)
       setBanner({ type: 'success', message: 'Record saved successfully.' })
       await fetchRows()
+      restoreScroll()
     } catch (error) {
       setBanner({ type: 'error', message: error.message || 'Failed to save record.' })
     } finally {
@@ -725,7 +805,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const focus = () => {
       if (!editingRowRef.current) return
       const firstInput = editingRowRef.current.querySelector('input, select, textarea')
-      firstInput?.focus()
+      if (firstInput && typeof firstInput.focus === 'function') {
+        try { firstInput.focus({ preventScroll: true }) } catch (_) { firstInput.focus() }
+      }
+      restoreScroll()
     }
     if (typeof queueMicrotask === 'function') {
       queueMicrotask(focus)
@@ -783,6 +866,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
       setBanner({ type: 'success', message: `Imported ${successCount} record(s).` })
       await fetchRows()
+      if (tableScrollRef.current) {
+        const l = lastScrollPosRef.current.left || 0
+        const t = lastScrollPosRef.current.top || 0
+        tableScrollRef.current.scrollLeft = l
+        tableScrollRef.current.scrollTop = t
+      }
     } catch (error) {
       setBanner({ type: 'error', message: error.message || 'Import failed. Please verify the template.' })
     } finally {
@@ -792,6 +881,65 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }
 
   const triggerImport = () => fileInputRef.current?.click()
+
+  const handleExportPdf = async () => {
+    const selectedKeys = exportSelected.length ? exportSelected : exportableColumns.map((c) => c.key)
+    const selectedCols = exportableColumns.filter((c) => selectedKeys.includes(c.key))
+    const data = exportScope === 'selected'
+      ? sortedRows.filter((r) => selectedRows.includes(getRowId(r)))
+      : (exportScope === 'filtered' ? sortedRows : applySort(rows))
+    const findLabel = (key) => (columns.find((c) => c.key === key)?.label || key)
+    const formatCell = (key, val) => {
+      if (['firstName', 'middleName', 'lastName'].includes(key)) return normalizeText(val, 'name') || ''
+      if (isStudentView && key === 'interviewDate') return normalizeDate(val, 'short') || ''
+      return String(val ?? '')
+    }
+
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ])
+    const autoTable = autoTableModule.default
+    const formatMap = { A4: 'a4', Letter: 'letter', Legal: 'legal' }
+    const doc = new jsPDF({ orientation: exportOrientation, unit: 'mm', format: formatMap[exportPaperSize] || 'a4' })
+
+    let y = 10
+    doc.setFontSize(16)
+    doc.text(headerTitle, 10, y)
+    y += 6
+    doc.setFontSize(11)
+    doc.text(headerSubtitle, 10, y)
+    y += 8
+
+    const headAll = selectedCols.map((c) => findLabel(c.key))
+    const bodyAll = data.map((row) => selectedCols.map((c) => formatCell(c.key, row[c.key])))
+
+    autoTable(doc, {
+      head: [headAll],
+      body: bodyAll,
+      startY: y,
+      styles: { fontSize: 7, cellPadding: 1, overflow: 'linebreak', cellWidth: 'wrap' },
+      headStyles: { fillColor: [249, 196, 196], textColor: [91, 26, 48] },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { top: 10, left: 10, right: 10, bottom: 10 },
+      tableWidth: 'auto',
+      horizontalPageBreak: true,
+      didDrawPage: (dataCtx) => {
+        const pageCount = typeof doc.getNumberOfPages === 'function' ? doc.getNumberOfPages() : (doc.internal.getNumberOfPages?.() || 1)
+        const pageInfo = doc.internal.getCurrentPageInfo?.()
+        const pageNumber = dataCtx.pageNumber || pageInfo?.pageNumber || 1
+        const pw = doc.internal.pageSize.getWidth()
+        const ph = doc.internal.pageSize.getHeight()
+        doc.setFontSize(9)
+        doc.text(`${pageNumber}/${pageCount}`, pw - 12, ph - 6, { align: 'right' })
+      },
+    })
+
+    const datasetName = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
+    const fileName = `records_${datasetName}_${new Date().toISOString().slice(0, 10)}.pdf`
+    doc.save(fileName)
+    setShowExportModal(false)
+  }
 
   const handleArchive = async (row) => {
     try {
@@ -854,6 +1002,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
             <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
             <p className="text-base text-[#8b4a5d] max-w-3xl">{headerSubtitle}</p>
+            <div className="w-full max-w-sm mt-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name"
+                className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
+              />
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             {navLinks.map((link) => {
@@ -907,6 +1064,13 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             <div className="flex gap-4">
             <button
               type="button"
+              onClick={() => { setExportSelected(exportableColumns.map((c) => c.key)); setShowExportModal(true) }}
+              className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400"
+            >
+              Export PDF
+            </button>
+            <button
+              type="button"
               onClick={() => setShowFormatModal(true)}
               disabled={importing}
               className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
@@ -931,11 +1095,19 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
         </div>
 
 
-        <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col">
-          <div className="overflow-auto rounded-[32px] border border-[#f7d6d6] max-h-[70vh]">
+        <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col min-h-0">
+          <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
+          <div ref={tableScrollRef} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
             <table className="min-w-[1800px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-sm font-semibold">
+                  <th style={{ minWidth: '60px' }} className="px-4 py-4 text-left sticky top-0 z-20 bg-[#f9c4c4]">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={() => { allVisibleSelected ? clearSelection() : selectAllVisible() }}
+                    />
+                  </th>
                   {columns.map((column) => {
                     const options = getSortOptions(column.key)
                     const activeSort = sortConfigs.find((s) => s.key === column.key)
@@ -944,7 +1116,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                       <th
                         key={column.key}
                         style={{ minWidth: column.width }}
-                        className="px-4 py-4 text-left uppercase tracking-wide"
+                        className="px-4 py-4 text-left uppercase tracking-wide sticky top-0 z-20 bg-[#f9c4c4]"
                       >
                         <div className="flex items-center gap-3 text-xs">
                           <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>{column.label}</span>
@@ -1027,9 +1199,17 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                         className={`${background} border-b border-[#f2f2f2] hover:bg-rose-50 transition`}
                         onDoubleClick={() => beginEditing(row)}
                       >
+                        <td className="px-4 py-3 align-middle text-sm text-[#4b1d2d]">
+                          <input
+                            type="checkbox"
+                            disabled={!getRowId(row)}
+                            checked={selectedRows.includes(getRowId(row))}
+                            onChange={() => toggleRowSelect(row)}
+                          />
+                        </td>
                         {columns.map((column) => {
                           const value = row[column.key] ?? ''
-    return (
+                          return (
                             <td key={column.key} className="px-4 py-3 align-middle text-sm text-[#4b1d2d]">
                               {isEditing ? (
                                 column.key === 'recordCategory' ? (
@@ -1093,35 +1273,35 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     onKeyDown={handleKeyDown}
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   />
-                            ) : RATING_COLUMN_KEYS.has(column.key) ? (
-                              <select
-                                value={editingValues[column.key] ?? ''}
-                                onChange={(event) => handleFieldChange(column.key, event.target.value)}
-                                onKeyDown={handleKeyDown}
-                                className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                              >
-                                <option value="">Select</option>
-                                {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
-                                  <option key={rating} value={rating}>
-                                    {rating}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : column.key === 'interviewerDecision' ? (
-                              <select
-                                value={editingValues[column.key] ?? ''}
-                                onChange={(event) => handleFieldChange(column.key, event.target.value)}
-                                onKeyDown={handleKeyDown}
-                                className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                              >
-                                <option value="">Select</option>
-                                {DECISION_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
+                                ) : RATING_COLUMN_KEYS.has(column.key) ? (
+                                  <select
+                                    value={editingValues[column.key] ?? ''}
+                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                  >
+                                    <option value="">Select</option>
+                                    {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
+                                      <option key={rating} value={rating}>
+                                        {rating}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : column.key === 'interviewerDecision' ? (
+                                  <select
+                                    value={editingValues[column.key] ?? ''}
+                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                  >
+                                    <option value="">Select</option>
+                                    {DECISION_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
                                   <input
                                     type="text"
                                     value={editingValues[column.key] ?? ''}
@@ -1161,7 +1341,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     <button
                                       type="button"
                                       onClick={() => handleArchive(row)}
-                                      className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                                      className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200"
                                     >
                                       Archive
                                     </button>
@@ -1226,6 +1406,92 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           <option key={option} value={option} />
         ))}
       </datalist>
+
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowExportModal(false)}>
+          <div className="relative w-full max-w-4xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-rose-100 to-pink-100 px-8 py-6 border-b border-rose-200">
+              <h2 className="text-2xl font-semibold text-[#5b1a30]">Export to PDF</h2>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#5b1a30]">Scope</p>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={exportScope === 'filtered'} onChange={() => setExportScope('filtered')} />
+                    Current search/filter
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={exportScope === 'all'} onChange={() => setExportScope('all')} />
+                    All rows in view
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={exportScope === 'selected'} onChange={() => setExportScope('selected')} disabled={selectedRows.length === 0} />
+                    Selected student(s)
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#5b1a30]">Paper Size</p>
+                <div className="w-full max-w-xs">
+                  <select
+                    value={exportPaperSize}
+                    onChange={(e) => setExportPaperSize(e.target.value)}
+                    className="w-full rounded-full border border-rose-200 bg-white px-4 py-2 text-sm text-[#5b1a30]"
+                  >
+                    <option value="A4">A4</option>
+                    <option value="Letter">Letter</option>
+                    <option value="Legal">Legal</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#5b1a30]">Columns</p>
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" className="rounded-full border border-rose-200 px-3 py-1 text-xs text-[#c4375b]" onClick={() => setExportSelected(exportableColumns.map((c) => c.key))}>Select All</button>
+                  <button type="button" className="rounded-full border border-rose-200 px-3 py-1 text-xs text-[#c4375b]" onClick={() => setExportSelected([])}>Clear</button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm text-[#4b1d2d]">
+                  {exportableColumns.map((col) => (
+                    <label key={col.key} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={exportSelected.includes(col.key)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setExportSelected((prev) => {
+                            const set = new Set(prev)
+                            if (checked) set.add(col.key); else set.delete(col.key)
+                            return Array.from(set)
+                          })
+                        }}
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#5b1a30]">Orientation</p>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={exportOrientation === 'landscape'} onChange={() => setExportOrientation('landscape')} />
+                    Landscape
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={exportOrientation === 'portrait'} onChange={() => setExportOrientation('portrait')} />
+                    Portrait
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="bg-rose-50 px-8 py-6 border-t border-rose-200 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowExportModal(false)} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b]">Cancel</button>
+              <button type="button" onClick={handleExportPdf} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white hover:bg-[#a62a49]">Export</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showFormatModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowFormatModal(false)}>
