@@ -35,7 +35,8 @@ export async function createInvite(req, res, next) {
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60000);
     const invite = await OfficerInvite.create({ email, token, batch, expiresAt });
-    res.json({ inviteLink: `${process.env.CLIENT_URL}/signup?token=${invite.token}` });
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    res.json({ inviteLink: `${clientUrl}/signup?token=${invite.token}` });
   } catch (e) { next(e); }
 }
 
@@ -114,7 +115,8 @@ export async function requestPasswordReset(req, res, next) {
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60000);
     const pr = await PasswordReset.create({ email: user.email, token, expiresAt });
-    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${pr.token}`;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetLink = `${clientUrl}/reset-password?token=${pr.token}`;
     try {
       await sendPasswordResetEmail(user.email, resetLink);
     } catch (mailErr) {
