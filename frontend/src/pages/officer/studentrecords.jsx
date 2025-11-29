@@ -38,15 +38,7 @@ export function OfficerRecordsOverview() {
   
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />;
-  
-  return (
-    <ErrorBoundary>
-      <div className="flex">
-        <OfficerSidebar />
-        <RecordsOverviewContent basePath="/officer/records" />
-      </div>
-    </ErrorBoundary>
-  );
+  return <Navigate to="/officer/records/applicants" replace />;
 }
 
 OfficerRecordsOverview.propTypes = {};

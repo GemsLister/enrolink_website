@@ -167,16 +167,16 @@ const VIEW_META = {
 
 const CARD_DEFS = [
   {
-    key: 'enrollees',
-    title: 'Enrollees',
-    description: 'Confirmed learners already slotted for the term.',
-    accent: 'from-rose-200 to-rose-100',
-  },
-  {
     key: 'applicants',
     title: 'Applicants',
     description: 'In-flight applicants waiting for interviews and scoring.',
     accent: 'from-red-200 to-pink-100',
+  },
+  {
+    key: 'enrollees',
+    title: 'Enrollees',
+    description: 'Confirmed learners already slotted for the term.',
+    accent: 'from-rose-200 to-rose-100',
   },
   {
     key: 'students',
@@ -384,6 +384,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const rowsRef = useRef([])
   const tableScrollRef = useRef(null)
   const lastScrollPosRef = useRef({ left: 0, top: 0 })
+  const handleTableScroll = useCallback((event) => {
+    const el = event.currentTarget || event.target
+    if (!el) return
+    lastScrollPosRef.current = {
+      left: el.scrollLeft || 0,
+      top: el.scrollTop || 0,
+    }
+    if (sortMenuKey) setSortMenuKey('')
+  }, [])
   const restoreScroll = useCallback(() => {
     const el = tableScrollRef.current
     if (!el) return
@@ -418,6 +427,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [sortConfigs, setSortConfigs] = useState([])
   const [sortMenuKey, setSortMenuKey] = useState('')
   const sortMenuRefs = useRef({})
+  const sortMenuOverlayRef = useRef(null)
+  const [sortMenuPos, setSortMenuPos] = useState({ left: 0, top: 0 })
   const [showFormatModal, setShowFormatModal] = useState(false)
   const [archiveType, setArchiveType] = useState('enrollees')
   const [searchQuery, setSearchQuery] = useState('')
@@ -482,6 +493,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     fetchRows()
   }, [fetchRows, view, archiveType, isArchiveView])
 
+  useEffect(() => {
+    if (!loading) restoreScroll()
+  }, [loading, restoreScroll])
+
   const getSortOptions = (key) => {
     if (key === 'recordCategory' || key === 'remarks') {
       return null
@@ -522,6 +537,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
         { value: 'no-result', label: 'NO RESULT' },
       ]
     }
+    if (key === 'enrollmentStatus') {
+      return [
+        { value: 'pending', label: 'PENDING' },
+        { value: 'enrolled', label: 'ENROLLED' },
+      ]
+    }
     return [
       { value: 'asc', label: 'Ascending' },
       { value: 'desc', label: 'Descending' },
@@ -541,14 +562,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }
 
   const toggleSortMenu = (key) => {
-    setSortMenuKey((prev) => (prev === key ? '' : key))
+    setSortMenuKey((prev) => {
+      const next = prev === key ? '' : key
+      if (next) {
+        const node = sortMenuRefs.current[key]
+        if (node) {
+          const rect = node.getBoundingClientRect()
+          const left = Math.max(8, Math.min(rect.left, (window.innerWidth || 0) - 208))
+          const top = Math.max(8, rect.bottom + 8)
+          setSortMenuPos({ left, top })
+        }
+      }
+      return next
+    })
   }
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!sortMenuKey) return
-      const refNode = sortMenuRefs.current[sortMenuKey]
-      if (refNode && !refNode.contains(event.target)) {
+      const triggerNode = sortMenuRefs.current[sortMenuKey]
+      const overlayNode = sortMenuOverlayRef.current
+      const target = event.target
+      const insideTrigger = triggerNode && triggerNode.contains(target)
+      const insideOverlay = overlayNode && overlayNode.contains(target)
+      if (!insideTrigger && !insideOverlay) {
         setSortMenuKey('')
       }
     }
@@ -642,26 +679,41 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               else if (bIdx === 3) comparison = 1
               else comparison = aIdx - bIdx
             }
-          } else if (key === 'interviewerDecision') {
-            const order = { PASSED: 0, FAILED: 1, 'NO RESULT': 2 }
-            const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
-            const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
-            if (direction === 'passed') {
-              if (aIdx === 0 && bIdx === 0) comparison = 0
-              else if (aIdx === 0) comparison = -1
-              else if (bIdx === 0) comparison = 1
-              else comparison = aIdx - bIdx
-            } else if (direction === 'failed') {
-              if (aIdx === 1 && bIdx === 1) comparison = 0
-              else if (aIdx === 1) comparison = -1
-              else if (bIdx === 1) comparison = 1
-              else comparison = aIdx - bIdx
-            } else if (direction === 'no-result') {
-              if (aIdx === 2 && bIdx === 2) comparison = 0
-              else if (aIdx === 2) comparison = -1
-              else if (bIdx === 2) comparison = 1
-              else comparison = aIdx - bIdx
-            }
+        } else if (key === 'interviewerDecision') {
+          const order = { PASSED: 0, FAILED: 1, 'NO RESULT': 2 }
+          const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
+          const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
+          if (direction === 'passed') {
+            if (aIdx === 0 && bIdx === 0) comparison = 0
+            else if (aIdx === 0) comparison = -1
+            else if (bIdx === 0) comparison = 1
+            else comparison = aIdx - bIdx
+          } else if (direction === 'failed') {
+            if (aIdx === 1 && bIdx === 1) comparison = 0
+            else if (aIdx === 1) comparison = -1
+            else if (bIdx === 1) comparison = 1
+            else comparison = aIdx - bIdx
+          } else if (direction === 'no-result') {
+            if (aIdx === 2 && bIdx === 2) comparison = 0
+            else if (aIdx === 2) comparison = -1
+            else if (bIdx === 2) comparison = 1
+            else comparison = aIdx - bIdx
+          }
+        } else if (key === 'enrollmentStatus') {
+          const order = { PENDING: 0, ENROLLED: 1 }
+          const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
+          const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
+          if (direction === 'pending') {
+            if (aIdx === 0 && bIdx === 0) comparison = 0
+            else if (aIdx === 0) comparison = -1
+            else if (bIdx === 0) comparison = 1
+            else comparison = aIdx - bIdx
+          } else if (direction === 'enrolled') {
+            if (aIdx === 1 && bIdx === 1) comparison = 0
+            else if (aIdx === 1) comparison = -1
+            else if (bIdx === 1) comparison = 1
+            else comparison = aIdx - bIdx
+          }
           } else if (key === 'number') {
             const aNum = Number(aVal)
             const bNum = Number(bVal)
@@ -762,6 +814,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
   const saveEditing = useCallback(async () => {
     if (!editingId || saving) return
+    if (tableScrollRef.current) {
+      lastScrollPosRef.current = {
+        left: tableScrollRef.current.scrollLeft || 0,
+        top: tableScrollRef.current.scrollTop || 0,
+      }
+    }
     const requiredFields = ['firstName', 'lastName']
     const missingField = requiredFields.find((field) => !normalizeText(editingValues[field]))
     if (missingField) {
@@ -800,6 +858,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [editingId, saveEditing])
+
+  useEffect(() => {
+    if (!editingId) restoreScroll()
+  }, [editingId, restoreScroll])
 
   const focusEditingRow = useCallback(() => {
     const focus = () => {
@@ -1097,7 +1159,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
         <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col min-h-0">
           <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
-          <div ref={tableScrollRef} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
+          <div ref={tableScrollRef} onScroll={handleTableScroll} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
             <table className="min-w-[1800px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-sm font-semibold">
@@ -1136,30 +1198,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                               >
                                 ▼
                               </button>
-                              {sortMenuKey === column.key && (
-                                <div className="absolute left-0 top-full mt-2 w-48 rounded-2xl border border-rose-100 bg-white shadow-xl text-xs text-[#5b1a30] z-30">
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2 text-left hover:bg-rose-50"
-                                    onClick={() => handleSortChange(column.key, '')}
-                                  >
-                                    Clear sort
-                                  </button>
-                                  <div className="border-t border-rose-50" />
-                                  {options.map((option) => (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
-                                        selected === option.value ? 'bg-rose-100 font-semibold' : ''
-                                      }`}
-                                      onClick={() => handleSortChange(column.key, option.value)}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              {/* menu rendered as fixed overlay below */}
                             </div>
                           )}
                         </div>
@@ -1391,6 +1430,34 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               </tbody>
             </table>
           </div>
+          {Boolean(sortMenuKey) && (
+            <div
+              ref={sortMenuOverlayRef}
+              style={{ position: 'fixed', left: sortMenuPos.left, top: sortMenuPos.top }}
+              className="w-48 rounded-2xl border border-rose-100 bg-white shadow-2xl text-xs text-[#5b1a30] z-[1000]"
+            >
+              <button
+                type="button"
+                className="w-full px-4 py-2 text-left hover:bg-rose-50"
+                onClick={() => handleSortChange(sortMenuKey, '')}
+              >
+                Clear sort
+              </button>
+              <div className="border-t border-rose-50" />
+              {(getSortOptions(sortMenuKey) || []).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
+                    (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
+                  }`}
+                  onClick={() => handleSortChange(sortMenuKey, option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1597,12 +1664,7 @@ export function HeadRecordsOverview() {
   const { isAuthenticated, user } = useAuth()
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || user.role !== 'DEPT_HEAD') return <Navigate to="/" replace />
-    return (
-        <div className="flex">
-            <Sidebar />
-      <RecordsOverviewContent basePath="/head/records" />
-            </div>
-  )
+  return <Navigate to="/head/records/applicants" replace />
 }
 
 export default function StudentRecords({ view = 'applicants' }) {
