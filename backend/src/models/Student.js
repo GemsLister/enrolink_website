@@ -14,6 +14,7 @@ const StudentSchema = new mongoose.Schema(
     birthdate: String,
     email: String,
     contact: String,
+    enrollmentStatus: { type: String, enum: ['ENROLLED', 'PENDING'], default: undefined },
     address: String,
     school: String,
     strand: String,
@@ -42,7 +43,8 @@ const StudentSchema = new mongoose.Schema(
     interviewDate: String,
     remarks: String,
     interviewId: { type: mongoose.Schema.Types.ObjectId, ref: 'Interview' },
-    nameSignature: { type: String, index: true }
+    nameSignature: { type: String, index: true },
+    archived_at: { type: String, default: undefined }
   },
   { timestamps: true, optimisticConcurrency: true }
 );

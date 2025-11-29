@@ -16,6 +16,12 @@ export async function list(req, res, next) {
     const q = {};
     if (req.query.batch) q.batch = req.query.batch;
     if (req.query.recordCategory) q.recordCategory = req.query.recordCategory;
+    const archived = String(req.query.archived || '').toLowerCase();
+    if (archived === '1' || archived === 'true') {
+      q.archived_at = { $ne: null };
+    } else if (archived === '0') {
+      q.$or = [{ archived_at: { $exists: false } }, { archived_at: null }];
+    }
     const rows = await Student.find(q).lean();
     res.json({ rows });
   } catch (e) { 

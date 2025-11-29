@@ -37,6 +37,7 @@ function App() {
       <Route path="/head/records/applicants" element={<StudentRecords view="applicants" />} />
       <Route path="/head/records/enrollees" element={<StudentRecords view="enrollees" />} />
       <Route path="/head/records/students" element={<StudentRecords view="students" />} />
+      <Route path="/head/records/archive" element={<StudentRecords view="archive" />} />
       <Route path="/head/student-records" element={<Navigate to="/head/records/applicants" replace />} />
       <Route path="/head/batch-management" element={<BatchManagement />} />
       <Route path="/head/enrollment-officers" element={<EnrollmentOfficers />} />
@@ -50,6 +51,7 @@ function App() {
       <Route path="/officer/records/applicants" element={<OfficerStudentRecords view="applicants" />} />
       <Route path="/officer/records/enrollees" element={<OfficerStudentRecords view="enrollees" />} />
       <Route path="/officer/records/students" element={<OfficerStudentRecords view="students" />} />
+      <Route path="/officer/records/archive" element={<OfficerStudentRecords view="archive" />} />
       <Route path="/officer/student-records" element={<Navigate to="/officer/records/applicants" replace />} />
       <Route path="/officer/reports" element={<OfficerReports />} />
       <Route path="/officer/batch-management" element={<OfficerBatchManagement />} />

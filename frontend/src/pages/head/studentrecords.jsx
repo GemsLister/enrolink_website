@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
 
-const TABLE_COLUMNS = [
+const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
   { key: 'course', label: 'Course', width: '140px' },
   { key: 'examineeNo', label: 'Examinee No.', width: '160px' },
@@ -39,9 +39,37 @@ const TABLE_COLUMNS = [
   { key: 'finalScore', label: 'Final Score (Percentile Score, Q Score, S Score)', width: '260px' },
   { key: 'remarks', label: 'Remarks', width: '200px' },
   { key: 'recordCategory', label: 'Status', width: '150px' },
+  { key: 'actions', label: 'Actions', width: '160px' },
 ]
 
-const IMPORT_HEADERS = [
+const ENROLLEE_COLUMNS = [
+  { key: 'course', label: 'Course', width: '140px' },
+  { key: 'examineeNo', label: 'Enrollee No.', width: '160px' },
+  { key: 'lastName', label: 'Lastname', width: '160px' },
+  { key: 'firstName', label: 'Firstname', width: '160px' },
+  { key: 'middleName', label: 'Middle Name', width: '180px' },
+  { key: 'email', label: 'Email Address', width: '220px' },
+  { key: 'contact', label: 'Contact #', width: '160px' },
+  { key: 'enrollmentStatus', label: 'Enrollment Status', width: '180px' },
+  { key: 'recordCategory', label: 'Status', width: '150px' },
+  { key: 'remarks', label: 'Remarks', width: '200px' },
+  { key: 'actions', label: 'Actions', width: '160px' },
+]
+
+const STUDENT_COLUMNS = [
+  { key: 'course', label: 'Course', width: '140px' },
+  { key: 'examineeNo', label: 'Student No.', width: '160px' },
+  { key: 'lastName', label: 'Lastname', width: '160px' },
+  { key: 'firstName', label: 'Firstname', width: '160px' },
+  { key: 'middleName', label: 'Middle Name', width: '180px' },
+  { key: 'email', label: 'Email Address', width: '220px' },
+  { key: 'contact', label: 'Contact #', width: '160px' },
+  { key: 'interviewDate', label: 'Date Enrolled', width: '160px' },
+  { key: 'recordCategory', label: 'Status', width: '150px' },
+  { key: 'actions', label: 'Actions', width: '160px' },
+]
+
+const IMPORT_HEADERS_APPLICANTS = [
   { key: 'number', label: 'no' },
   { key: 'course', label: 'course' },
   { key: 'examineeNo', label: 'examinee_no' },
@@ -69,6 +97,29 @@ const IMPORT_HEADERS = [
   { key: 'remarks', label: 'remarks' },
 ]
 
+const IMPORT_HEADERS_STUDENTS = [
+  { key: 'course', label: 'course' },
+  { key: 'examineeNo', label: 'student_no' },
+  { key: 'lastName', label: 'lastname' },
+  { key: 'firstName', label: 'firstname' },
+  { key: 'middleName', label: 'middle_name' },
+  { key: 'email', label: 'email' },
+  { key: 'contact', label: 'contact' },
+  { key: 'interviewDate', label: 'date_enrolled' },
+]
+
+const IMPORT_HEADERS_ENROLLEES = [
+  { key: 'course', label: 'course' },
+  { key: 'examineeNo', label: 'enrollee_no' },
+  { key: 'lastName', label: 'lastname' },
+  { key: 'firstName', label: 'firstname' },
+  { key: 'middleName', label: 'middle_name' },
+  { key: 'email', label: 'email' },
+  { key: 'contact', label: 'contact' },
+  { key: 'enrollmentStatus', label: 'enrollment_status' },
+  { key: 'remarks', label: 'remarks' },
+]
+
 const DATE_COLUMN_KEYS = new Set(['interviewDate'])
 const RATING_COLUMN_KEYS = new Set([
   'academicTechnicalBackground',
@@ -83,14 +134,19 @@ const CATEGORY_OPTIONS = ['Applicant', 'Enrollee', 'Student']
 const SHS_STRAND_OPTIONS = ['STEM', 'ABM', 'HUMSS', 'TVL-ICT']
 const DECISION_OPTIONS = ['PASSED', 'FAILED', 'NO RESULT']
 const SOURCE_OPTIONS = ['WAITLIST', 'PRIORITY', 'VVIP']
+const ENROLLMENT_STATUS_OPTIONS = ['ENROLLED', 'PENDING']
 const VIEW_TO_CATEGORY = {
   applicants: 'Applicant',
   enrollees: 'Enrollee',
   students: 'Student',
 }
 
-const EMPTY_RECORD = TABLE_COLUMNS.reduce((acc, column) => {
-  acc[column.key] = ''
+const ALL_COLUMN_KEYS = Array.from(
+  new Set([...APPLICANT_COLUMNS, ...ENROLLEE_COLUMNS, ...STUDENT_COLUMNS].map((column) => column.key))
+)
+
+const EMPTY_RECORD = ALL_COLUMN_KEYS.reduce((acc, key) => {
+  acc[key] = ''
   return acc
 }, {})
 
@@ -128,9 +184,13 @@ const CARD_DEFS = [
     description: 'Returning students progressing through the program.',
     accent: 'from-rose-200 to-amber-100',
   },
+  {
+    key: 'archive',
+    title: 'Archive',
+    description: 'Browse archived records and restore or purge.',
+    accent: 'from-rose-200 to-pink-100',
+  },
 ]
-
-const FILE_HEADERS = TABLE_COLUMNS.map((column) => column.label.toLowerCase())
 
 const titleCase = (value) => {
   return value
@@ -154,36 +214,51 @@ const normalizeText = (value, type) => {
   return cleaned
 }
 
-const normalizeDate = (value) => {
+const normalizeDate = (value, format = 'long') => {
   if (value === undefined || value === null || value === '') return ''
   if (typeof value === 'number' && Number.isFinite(value)) {
     const ms = Math.round((value - 25569) * 86400 * 1000)
     const date = new Date(ms)
     if (Number.isNaN(date.getTime())) return ''
-    return date.toISOString().slice(0, 10)
+    const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const dd = String(date.getUTCDate()).padStart(2, '0')
+    const yyyy = date.getUTCFullYear()
+    return format === 'short' ? `${mm}/${dd}/${String(yyyy).slice(-2)}` : `${mm}/${dd}/${yyyy}`
   }
   const text = normalizeText(value)
   if (!text) return ''
   if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(text)) {
     const [y, m, d] = text.split('-')
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    const mm = m.padStart(2, '0')
+    const dd = d.padStart(2, '0')
+    return format === 'short' ? `${mm}/${dd}/${String(y).slice(-2)}` : `${mm}/${dd}/${y}`
+  }
+  const shortMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (shortMatch) {
+    const mm = shortMatch[1].padStart(2, '0')
+    const dd = shortMatch[2].padStart(2, '0')
+    const yy = shortMatch[3]
+    const year = Number(yy) + (Number(yy) >= 70 ? 1900 : 2000)
+    return format === 'short' ? `${mm}/${dd}/${yy}` : `${mm}/${dd}/${year}`
   }
   const alt = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
   if (alt) {
     const [, a, b, y] = alt
     const month = parseInt(a, 10) > 12 ? b : a
     const day = parseInt(a, 10) > 12 ? a : b
-    return `${y}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    const mm = String(month).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    return format === 'short' ? `${mm}/${dd}/${String(y).slice(-2)}` : `${mm}/${dd}/${y}`
   }
   const parsed = new Date(text)
   if (Number.isNaN(parsed.getTime())) return ''
   const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0')
   const dd = String(parsed.getUTCDate()).padStart(2, '0')
   const yyyy = parsed.getUTCFullYear()
-  return `${mm}/${dd}/${yyyy}`
+  return format === 'short' ? `${mm}/${dd}/${String(yyyy).slice(-2)}` : `${mm}/${dd}/${yyyy}`
 }
 
-const parseXlsx = async (file, forcedCategory) => {
+const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'long' } = {}) => {
   const XLSX = await import('xlsx')
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array' })
@@ -192,35 +267,32 @@ const parseXlsx = async (file, forcedCategory) => {
   if (!rawRows.length) throw new Error('The uploaded file is empty.')
 
   const header = rawRows[0].map((cell) => normalizeText(cell).toLowerCase())
-  const expectedHeaders = IMPORT_HEADERS.map((h) => h.label)
+  const expectedHeaders = importHeaders.map((h) => h.label)
   const isValid = expectedHeaders.every((label, index) => header[index] === label)
   if (!isValid) {
     throw new Error('Column headers do not match the required template.')
   }
 
   const dataRows = rawRows.slice(1)
-  const normalizeCategory = (value) => {
-    const text = normalizeText(value).toLowerCase()
-    if (text === 'enrollee') return 'Enrollee'
-    if (text === 'student') return 'Student'
-    return 'Applicant'
-  }
 
   return dataRows
     .map((row) => {
       if (!row || row.every((cell) => normalizeText(cell) === '')) return null
-      const record = IMPORT_HEADERS.reduce((acc, column, idx) => {
+      const record = importHeaders.reduce((acc, column, idx) => {
         const rawValue = row[idx]
-        if (column.key === 'recordCategory') {
-          acc[column.key] = normalizeCategory(rawValue)
-        } else if (column.key === 'course') {
+        if (column.key === 'course') {
           const normalized = normalizeText(rawValue).toUpperCase()
           acc[column.key] = normalized === 'BSIT' || normalized === 'BSEMC-DAT' ? normalized : ''
         } else if (column.key === 'source') {
           const normalized = normalizeText(rawValue).toUpperCase()
           acc[column.key] = SOURCE_OPTIONS.includes(normalized) ? normalized : ''
+        } else if (column.key === 'enrollmentStatus') {
+          const normalized = normalizeText(rawValue).toUpperCase()
+          acc[column.key] = ENROLLMENT_STATUS_OPTIONS.includes(normalized) ? normalized : ''
         } else if (['firstName', 'middleName', 'lastName'].includes(column.key)) {
           acc[column.key] = normalizeText(rawValue, 'name')
+        } else if (column.key === 'interviewDate') {
+          acc[column.key] = normalizeDate(rawValue, dateFormat)
         } else if (PERCENTAGE_COLUMN_KEYS.has(column.key)) {
           acc[column.key] = normalizeText(rawValue)
         } else {
@@ -306,6 +378,7 @@ export function RecordsOverviewContent({ basePath }) {
 export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const api = useApi(token)
   const navigate = useNavigate()
+  const location = useLocation()
   const fileInputRef = useRef(null)
   const editingRowRef = useRef(null)
   const rowsRef = useRef([])
@@ -322,9 +395,29 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [sortMenuKey, setSortMenuKey] = useState('')
   const sortMenuRefs = useRef({})
   const [showFormatModal, setShowFormatModal] = useState(false)
+  const [archiveType, setArchiveType] = useState('enrollees')
 
-  const currentCategory = VIEW_TO_CATEGORY[view] || 'Applicant'
+  const isArchiveView = view === 'archive'
+  const currentCategory = isArchiveView ? VIEW_TO_CATEGORY[archiveType] : (VIEW_TO_CATEGORY[view] || 'Applicant')
   const currentView = VIEW_META[view] || VIEW_META.applicants
+  const headerTitle = isArchiveView
+    ? (archiveType === 'enrollees' ? 'Archived Enrollees' : (archiveType === 'students' ? 'Archived Students' : 'Archived Applicants'))
+    : currentView.title
+  const headerSubtitle = isArchiveView
+    ? (archiveType === 'enrollees'
+        ? 'List of Archived First Year Enrollees'
+        : (archiveType === 'students'
+            ? 'List of Archived First Year Students'
+            : 'List of Archived First Year Applicants'))
+    : currentView.subtitle
+  const isStudentView = (isArchiveView ? archiveType === 'students' : view === 'students')
+  const isEnrolleeView = (isArchiveView ? archiveType === 'enrollees' : view === 'enrollees')
+  const columns = isStudentView ? STUDENT_COLUMNS : isEnrolleeView ? ENROLLEE_COLUMNS : APPLICANT_COLUMNS
+  const importHeaders = isStudentView
+    ? IMPORT_HEADERS_STUDENTS
+    : isEnrolleeView
+      ? IMPORT_HEADERS_ENROLLEES
+      : IMPORT_HEADERS_APPLICANTS
   const navLinks = useMemo(
     () => CARD_DEFS.map((card) => ({ key: card.key, label: card.title, href: `${basePath}/${card.key}` })),
     [basePath]
@@ -335,6 +428,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     try {
       const params = {}
       if (currentCategory) params.recordCategory = currentCategory
+      params.archived = isArchiveView ? '1' : '0'
       const queryString = Object.keys(params)
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
         .join('&')
@@ -349,16 +443,17 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     } finally {
       setLoading(false)
     }
-  }, [api, currentCategory, setBanner])
+  }, [api, currentCategory, isArchiveView, setBanner])
 
   useEffect(() => {
     fetchRows()
-  }, [fetchRows, view])
+  }, [fetchRows, view, archiveType, isArchiveView])
 
   const getSortOptions = (key) => {
     if (key === 'recordCategory' || key === 'remarks') {
       return null
     }
+    if (key === 'actions') return null
     if (key === 'number') {
       return [
         { value: 'asc', label: 'Ascending' },
@@ -574,8 +669,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     if (!identifier) return
     setEditingId(identifier)
     const values = {}
-    TABLE_COLUMNS.forEach((column) => {
-      values[column.key] = row[column.key] ?? ''
+    ALL_COLUMN_KEYS.forEach((key) => {
+      values[key] = row[key] ?? ''
     })
     setEditingValues(values)
     setEditingMeta({
@@ -672,7 +767,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     if (!file) return
     try {
       setImporting(true)
-      const parsed = await parseXlsx(file, currentCategory)
+      const dateFormat = isStudentView ? 'short' : 'long'
+      const parsed = await parseXlsx(file, currentCategory, importHeaders, { dateFormat })
 
       let successCount = 0
       for (const record of parsed) {
@@ -697,44 +793,100 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
   const triggerImport = () => fileInputRef.current?.click()
 
+  const handleArchive = async (row) => {
+    try {
+      const payload = {}
+      ALL_COLUMN_KEYS.forEach((k) => { payload[k] = row[k] ?? '' })
+      if (row._id) payload.id = row._id
+      if (row.__v !== undefined) payload.__v = row.__v
+      payload.archived_at = new Date().toISOString()
+      await api.post('/students', payload)
+      setBanner({ type: 'success', message: 'Archived successfully.' })
+      const key = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
+      navigate(`${basePath}/archive?type=${encodeURIComponent(key)}`)
+      await fetchRows()
+    } catch (e) {
+      setBanner({ type: 'error', message: e.message || 'Failed to archive.' })
+    }
+  }
+
+  const handleRestore = async (row) => {
+    try {
+      const payload = {}
+      ALL_COLUMN_KEYS.forEach((k) => { payload[k] = row[k] ?? '' })
+      if (row._id) payload.id = row._id
+      if (row.__v !== undefined) payload.__v = row.__v
+      payload.archived_at = null
+      await api.post('/students', payload)
+      setBanner({ type: 'success', message: 'Restored successfully.' })
+      await fetchRows()
+    } catch (e) {
+      setBanner({ type: 'error', message: e.message || 'Failed to restore.' })
+    }
+  }
+
+  const handleDelete = async (row) => {
+    try {
+      if (!row._id) return
+      await api.delete(`/students/${row._id}`)
+      setBanner({ type: 'success', message: 'Deleted permanently.' })
+      await fetchRows()
+    } catch (e) {
+      setBanner({ type: 'error', message: e.message || 'Failed to delete.' })
+    }
+  }
+
+  useEffect(() => {
+    if (isArchiveView) {
+      const params = new URLSearchParams(location.search || '')
+      const t = params.get('type')
+      if (t && (t === 'enrollees' || t === 'applicants' || t === 'students')) {
+        setArchiveType(t)
+      }
+    }
+  }, [location.search, isArchiveView])
+
     return (
     <div className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-hidden">
       <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-            <div className="space-y-2">
-              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
-              <h1 className="text-4xl font-semibold text-[#5b1a30]">{currentView.title}</h1>
-              <p className="text-base text-[#8b4a5d] max-w-3xl">{currentView.subtitle}</p>
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setShowFormatModal(true)}
-                disabled={importing}
-                className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
-              >
-                {importing ? 'Importing…' : 'Import XLSX'}
-              </button>
-              <button
-                type="button"
-                onClick={handleAddNew}
-                className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]"
-              >
-                Add New
-              </button>
-            </div>
+          <div className="space-y-2">
+            <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+            <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
+            <p className="text-base text-[#8b4a5d] max-w-3xl">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             {navLinks.map((link) => {
-              const active = view === link.key
+              const isDatasetTab = link.key === 'enrollees' || link.key === 'applicants' || link.key === 'students'
+              const archiveActive = isArchiveView && link.key === 'archive'
+              const datasetActive = (isArchiveView && isDatasetTab && archiveType === link.key) || (!isArchiveView && view === link.key)
               return (
                 <button
                   key={link.key}
                   type="button"
-                  onClick={() => navigate(link.href)}
+                  onClick={() => {
+                    if (link.key === 'archive') {
+                      if (isArchiveView) {
+                        const dest = archiveType || 'applicants'
+                        navigate(`${basePath}/${dest}`)
+                      } else {
+                        const current = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
+                        navigate(`${basePath}/archive?type=${encodeURIComponent(current)}`)
+                      }
+                      return
+                    }
+                    if (isArchiveView && isDatasetTab) {
+                      navigate(`${basePath}/archive?type=${encodeURIComponent(link.key)}`)
+                    } else {
+                      navigate(link.href)
+                    }
+                  }}
                   className={`rounded-full px-6 py-2 text-sm font-medium transition ${
-                    active ? 'bg-[#c4375b] text-white shadow-lg shadow-rose-200/60' : 'bg-white text-[#c4375b]'
+                    archiveActive
+                      ? 'bg-[#a62a49] text-white shadow-lg shadow-rose-200/60'
+                      : datasetActive
+                        ? 'bg-[#c4375b] text-white shadow-lg shadow-rose-200/60'
+                        : 'bg-white text-[#c4375b]'
                   }`}
                 >
                   {link.label}
@@ -742,24 +894,49 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               )
             })}
           </div>
+          <div className="flex items-center justify-between gap-4 min-h-[48px]">
+            <div className="flex-1">
+              <div className={banner ? 'block' : 'hidden'}>
+                <div className={`rounded-2xl px-5 py-3 text-sm font-medium ${
+                  banner?.type === 'error' ? 'bg-[#F7D9D9] text-red-700' : 'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {banner?.message}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setShowFormatModal(true)}
+              disabled={importing}
+              className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
+            >
+              {importing
+                ? 'Importing…'
+                : isStudentView
+                  ? 'Import Students XLSX'
+                  : isEnrolleeView
+                    ? 'Import Enrollees XLSX'
+                    : 'Import Applicants XLSX'}
+            </button>
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]"
+            >
+              Add New
+            </button>
+            </div>
+          </div>
         </div>
 
-        {banner && (
-          <div
-            className={`rounded-2xl px-5 py-3 text-sm font-medium ${
-              banner.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-            }`}
-          >
-            {banner.message}
-          </div>
-        )}
 
         <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col">
           <div className="overflow-auto rounded-[32px] border border-[#f7d6d6] max-h-[70vh]">
             <table className="min-w-[1800px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-sm font-semibold">
-                  {TABLE_COLUMNS.map((column) => {
+                  {columns.map((column) => {
                     const options = getSortOptions(column.key)
                     const activeSort = sortConfigs.find((s) => s.key === column.key)
                     const selected = activeSort ? activeSort.direction : ''
@@ -822,14 +999,14 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={TABLE_COLUMNS.length} className="py-12 text-center text-sm text-rose-400">
+                    <td colSpan={columns.length} className="py-12 text-center text-sm text-rose-400">
                       Loading records…
                     </td>
                   </tr>
                 )}
                 {!loading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={TABLE_COLUMNS.length} className="py-12 text-center text-sm text-rose-400">
+                    <td colSpan={columns.length} className="py-12 text-center text-sm text-rose-400">
                       No records available yet. Use “Add New” or Import to get started.
                     </td>
                   </tr>
@@ -850,7 +1027,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                         className={`${background} border-b border-[#f2f2f2] hover:bg-rose-50 transition`}
                         onDoubleClick={() => beginEditing(row)}
                       >
-                        {TABLE_COLUMNS.map((column) => {
+                        {columns.map((column) => {
                           const value = row[column.key] ?? ''
     return (
                             <td key={column.key} className="px-4 py-3 align-middle text-sm text-[#4b1d2d]">
@@ -893,6 +1070,20 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                       </option>
                                     ))}
                                   </select>
+                                ) : column.key === 'enrollmentStatus' ? (
+                                  <select
+                                    value={editingValues[column.key] ?? ''}
+                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                  >
+                                    <option value="">Select</option>
+                                    {ENROLLMENT_STATUS_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
                                 ) : column.key === 'shsStrand' ? (
                                   <input
                                     type="text"
@@ -902,35 +1093,35 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     onKeyDown={handleKeyDown}
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   />
-                                ) : RATING_COLUMN_KEYS.has(column.key) ? (
-                                  <select
-                                    value={editingValues[column.key] ?? ''}
-                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                                  >
-                                    <option value="">Select</option>
-                                    {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
-                                      <option key={rating} value={rating}>
-                                        {rating}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : column.key === 'interviewerDecision' ? (
-                                  <select
-                                    value={editingValues[column.key] ?? ''}
-                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                                  >
-                                    <option value="">Select</option>
-                                    {DECISION_OPTIONS.map((option) => (
-                                      <option key={option} value={option}>
-                                        {option}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
+                            ) : RATING_COLUMN_KEYS.has(column.key) ? (
+                              <select
+                                value={editingValues[column.key] ?? ''}
+                                onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                onKeyDown={handleKeyDown}
+                                className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                              >
+                                <option value="">Select</option>
+                                {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
+                                  <option key={rating} value={rating}>
+                                    {rating}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : column.key === 'interviewerDecision' ? (
+                              <select
+                                value={editingValues[column.key] ?? ''}
+                                onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                onKeyDown={handleKeyDown}
+                                className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                              >
+                                <option value="">Select</option>
+                                {DECISION_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
                                   <input
                                     type="text"
                                     value={editingValues[column.key] ?? ''}
@@ -945,14 +1136,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     value={editingValues[column.key] ?? ''}
                                     onChange={(event) => handleFieldChange(column.key, event.target.value)}
                                     onBlur={(event) => {
-                                      const value = normalizeDate(event.target.value)
+                                      const format = isStudentView && column.key === 'interviewDate' ? 'short' : 'long'
+                                      const value = normalizeDate(event.target.value, format)
                                       if (value) {
                                         handleFieldChange(column.key, value)
                                       }
                                     }}
                                     onKeyDown={handleKeyDown}
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                                    placeholder="MM/DD/YYYY"
+                                    placeholder={isStudentView && column.key === 'interviewDate' ? 'MM/DD/YY' : 'MM/DD/YYYY'}
                                   />
                                 ) : (
                                   <input
@@ -963,12 +1155,52 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   />
                                 )
+                              ) : column.key === 'actions' ? (
+                                <div className="flex gap-2">
+                                  {view !== 'archive' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleArchive(row)}
+                                      className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                                    >
+                                      Archive
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRestore(row)}
+                                        className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                                      >
+                                        Restore
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDelete(row)}
+                                        className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#c4375b] hover:border-rose-400"
+                                      >
+                                        Delete Permanently
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               ) : column.key === 'recordCategory' && value ? (
                                 <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
                                   {value}
                                 </span>
                               ) : (
-                                <span>{['firstName', 'middleName', 'lastName'].includes(column.key) ? normalizeText(value, 'name') : value || '—'}</span>
+                                <span>
+                                  {(() => {
+                                    if (['firstName', 'middleName', 'lastName'].includes(column.key)) {
+                                      return normalizeText(value, 'name') || '—'
+                                    }
+                                    if (isStudentView && column.key === 'interviewDate') {
+                                      const formatted = normalizeDate(value, 'short')
+                                      return formatted || '—'
+                                    }
+                                    return value || '—'
+                                  })()}
+                                </span>
                               )}
                             </td>
                           )
@@ -1022,7 +1254,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                 </div>
                 <div className="bg-white p-4">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {IMPORT_HEADERS.map((column, idx) => (
+                    {importHeaders.map((column, idx) => (
                       <div key={column.key} className="flex items-start gap-2">
                         <span className="text-xs font-medium text-rose-400 min-w-[24px]">{idx + 1}.</span>
                         <span className="text-xs text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>{column.label}</span>
@@ -1036,17 +1268,36 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                   <p className="text-sm font-semibold text-[#5b1a30] uppercase tracking-wide">Important Notes</p>
                 </div>
                 <div className="bg-white p-4 space-y-2 text-sm text-[#4b1d2d]">
-                  <p>• Use the simplified headers exactly as shown above (e.g., <code>no, course, examinee_no, source, …</code>)</p>
+                  <p>
+                    • Use the simplified headers exactly as shown above (e.g.,{' '}
+                    <code>{importHeaders.map((h) => h.label).join(', ')}</code>)
+                  </p>
                   <p>• Headers are case-insensitive, but sticking to lowercase avoids typos</p>
                   <p>• Course must be either "BSIT" or "BSEMC-DAT"</p>
-                  <p>• Source must be WAITLIST, PRIORITY, or VVIP</p>
-                  <p>• Interview Date format: MM/DD/YYYY (e.g., 12/09/2004)</p>
-                  <p>• Percentile Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
-                  <p>• Rating columns (1-10): rating_academic, rating_skills, rating_teamwork, rating_comm, rating_problem, rating_ethics</p>
-                  <p>• SHS Strand: STEM, ABM, HUMSS, or TVL-ICT (or custom text)</p>
-                  <p>• Interviewer’s Decision: PASSED, FAILED, or NO RESULT</p>
-                  <p>• Remarks: Free text (optional notes from the team)</p>
-                  <p>• Status column will be automatically set based on which table you're importing to</p>
+                  {isStudentView ? (
+                    <>
+                      <p>• Student No. maps to the Student No. column in the table</p>
+                      <p>• Date Enrolled format: MM/DD/YY (e.g., 08/15/24)</p>
+                      <p>• Remarks column is optional and not part of the template</p>
+                    </>
+                  ) : isEnrolleeView ? (
+                    <>
+                      <p>• Enrollee No. maps to the Enrollee No. column in the table</p>
+                      <p>• Enrollment Status must be ENROLLED or PENDING</p>
+                      <p>• Remarks column is optional</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>• Source must be WAITLIST, PRIORITY, or VVIP</p>
+                      <p>• Interview Date format: MM/DD/YYYY (e.g., 12/09/2004)</p>
+                      <p>• Percentile Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
+                      <p>• Rating columns (1-10): rating_academic, rating_skills, rating_teamwork, rating_comm, rating_problem, rating_ethics</p>
+                      <p>• SHS Strand: STEM, ABM, HUMSS, or TVL-ICT (or custom text)</p>
+                      <p>• Interviewer’s Decision: PASSED, FAILED, or NO RESULT</p>
+                      <p>• Remarks: Free text (optional notes from the team)</p>
+                    </>
+                  )}
+                  <p>• Status is set automatically based on which Records tab you import from</p>
                 </div>
               </div>
             </div>
