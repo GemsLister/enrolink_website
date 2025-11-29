@@ -241,7 +241,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
           <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border border-[#e4b7bf] text-[#8a1d35] bg-white hover:bg-[#fff5f7]">Pending invites</button>
         </div>
 
-        <div className="bg-white rounded-3xl border border-[#efccd2] p-0 overflow-hidden">
+        <div className="bg-white rounded-[13px] border border-[#efccd2] p-0 overflow-hidden">
           <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3">Current Officers</div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

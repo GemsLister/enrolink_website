@@ -46,7 +46,7 @@ export default function OfficerSidebar() {
   }
 
   return (
-    <aside className="flex flex-col h-[100dvh] w-80 bg-gradient-to-b from-red-300 to-pink-100">
+    <aside className="flex flex-col h-full w-80 bg-gradient-to-b from-red-300 to-pink-100">
       <div className="p-8 flex justify-center overflow-visible">
         <Link to={'/officer'}>
           <img src={EnroLinkLogo} alt="EnroLink-logo" className="w-48 h-auto mt-[50px] mb-[30px] transform scale-125 origin-center z-10 transition-transform duration-200" />

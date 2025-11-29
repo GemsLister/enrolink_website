@@ -141,8 +141,9 @@ export const api = {
     resetPassword: (payload) => request('POST', '/auth/reset-password', { body: payload }),
 
 	// Dashboard
-    dashboardStats: (token, year) => request('GET', `/dashboard/stats${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
-    dashboardActivity: (token, year) => request('GET', `/dashboard/activity${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
+	    dashboardStats: (token, year) => request('GET', `/dashboard/stats${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
+	    dashboardActivity: (token, year) => request('GET', `/dashboard/activity${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
+	    dashboardPushGa: (token, year) => request('POST', `/dashboard/push-ga${year ? `?year=${encodeURIComponent(year)}` : ''}`, { token }),
 
 	// Officers
     officersList: (token) => request('GET', '/officers', { token }),

@@ -11,7 +11,7 @@ import BatchDetailsModal from './components/BatchDetailsModal'
 
 export default function BatchManagement({ embedded = false }) {
     const { isAuthenticated, user, token } = useAuth()
-    const {
+  const {
       batches, batchesLoading, query,
       filterBatch, filterStatus, filterInterviewer,
       sortField, sortDir, selectedIds,
@@ -30,9 +30,10 @@ export default function BatchManagement({ embedded = false }) {
       handleRowClick, closeModal, openImportForBatch, loadMembers,
       handleAddBatch, handleImport, submitImport, submitImportCsv,
       handleAddStudentSubmit,
+      saveBatchEdits,
       updateBatchStatus,
       setQuery, setFilterBatch, setFilterStatus, setFilterInterviewer, setSortField, setSortDir,
-    } = useBatchManagement(token, { allowInterviewer: user?.role === 'DEPT_HEAD' })
+  } = useBatchManagement(token, { allowInterviewer: user?.role === 'DEPT_HEAD' })
     if (!isAuthenticated) return <Navigate to="/login" replace />
     if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
 
@@ -128,6 +129,7 @@ export default function BatchManagement({ embedded = false }) {
               setAddValues={setAddValues}
               handleAddStudentSubmit={handleAddStudentSubmit}
               loadMembers={loadMembers}
+              saveBatchEdits={saveBatchEdits}
             />
       </>
     )

@@ -35,12 +35,18 @@ export async function list(req, res, next) {
 export async function create(req, res, next) {
   try {
     const Batch = getBatchModel();
-    const { year: rawYear, interviewer = '', status = 'PENDING' } = req.body || {};
+    const { year: rawYear, code: rawCode, interviewer = '', status = 'PENDING' } = req.body || {};
     const year = String(rawYear || new Date().getFullYear());
     const last = await Batch.findOne({ year }).sort({ index: -1 }).lean();
     const nextIndex = (last?.index || 0) + 1;
-    const padded = String(nextIndex).padStart(3, '0');
-    const code = `${year}-${padded}`;
+    let code = (rawCode ?? '').toString().trim();
+    if (!code) {
+      const padded = String(nextIndex).padStart(3, '0');
+      code = `${year}-${padded}`;
+    } else {
+      const existing = await Batch.findOne({ code }).lean();
+      if (existing) return res.status(400).json({ error: 'Batch code already exists' });
+    }
     const requesterRole = req.user?.role || '';
     const safeInterviewer = requesterRole === 'OFFICER' ? '' : (interviewer || '');
     const doc = await Batch.create({ code, year, index: nextIndex, interviewer: safeInterviewer, status });

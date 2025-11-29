@@ -71,6 +71,7 @@ export default function Dashboard() {
   const [gcal, setGcal] = useState([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+  const [gaPushing, setGaPushing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -179,7 +180,20 @@ export default function Dashboard() {
       await api.calendarDelete(token, id);
       await refreshCalendar();
     } catch (e) {
-      setError(e.message || 'Failed to delete schedule');
+      setError(e.message || "Failed to delete schedule");
+    }
+  }
+
+  async function pushAnalyticsToGA() {
+    if (!token) return;
+    try {
+      setGaPushing(true);
+      setError('');
+      await api.dashboardPushGa(token, startYear);
+    } catch (e) {
+      setError(e.message || 'Failed to push analytics');
+    } finally {
+      setGaPushing(false);
     }
   }
 
@@ -241,6 +255,9 @@ export default function Dashboard() {
                 </option>
               ))}
             </select>
+            <button onClick={pushAnalyticsToGA} disabled={gaPushing} className="ml-4 h-7 rounded-full border border-[#efccd2] px-3 text-[12px] text-[#7d102a] hover:bg-[#f8e7eb]">
+              {gaPushing ? 'Pushing…' : 'Push to GA'}
+            </button>
           </p>
 
           {/* Summary cards */}
@@ -353,7 +370,12 @@ export default function Dashboard() {
           </section>
           {/* Add schedule CTA */}
           <div className="mt-4 flex justify-end">
-            <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4"
+            >
+              Add schedule
+            </button>
           </div>
 
           {error && (
@@ -376,7 +398,7 @@ export default function Dashboard() {
             {/* Top bar: left search, right bell + name + caret */}
             <div className="flex items-center justify-between">
               {/* Left: compact search (kept) */}
-              <div className="relative" style={{ width: "220px" }}>
+              {/* <div className="relative" style={{ width: "220px" }}>
                 <input
                   type="search"
                   placeholder="search"
@@ -394,7 +416,7 @@ export default function Dashboard() {
                     </svg>
                   </div>
                 </span>
-              </div>
+              </div> */}
 
               {/* Right: bell | divider | name + caret */}
               <div className="flex items-center gap-3 text-[#2f2b33]">
@@ -403,26 +425,33 @@ export default function Dashboard() {
                 </svg>
                 <span className="h-5 w-px bg-[#b67a86]/60" />
                 <span className="text-base font-semibold">
-                  {user?.firstName || "Santiago"} {user?.lastName || "Garcia"}
+                  {/* {user?.firstName || "Santiago"} {user?.lastName || "Garcia"} */}
+                  Department Head
                 </span>
                 <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current">
                   <path d="M5.5 7.5l4.5 5 4.5-5H5.5z" />
                 </svg>
               </div>
             </div>
+            {/* Search bar */}
+            <div className="mt-3 relative w-full">
+              <input
+                type="search"
+                placeholder="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 w-full rounded-[10px] bg-white text-[13px] p-2 text-[#2f2b33] placeholder:text-[#8c7f86] outline-none focus:outline-none focus-visible:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]"
+              />
+            </div>
           </div>
 
           {/* Removed Add Schedule box */}
 
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-[#7d102a]">
-              Schedules
-            </h2>
+            <h2 className="text-sm font-bold text-[#7d102a]">Schedules</h2>
             <div className="mt-4 flex flex-col gap-3 pr-2 max-h-[320px] overflow-y-auto">
               {gcal.length === 0 && (
-                <div className="text-sm text-[#a86a74]">
-                  No schedules.
-                </div>
+                <div className="text-sm text-[#a86a74]">No schedules.</div>
               )}
               {gcal.map((ev) => {
                 const when = ev.start?.dateTime || ev.start?.date;
@@ -443,7 +472,10 @@ export default function Dashboard() {
                     </div>
                     {!ev.htmlLink && (
                       <button
-                        onClick={() => { if (window.confirm('Delete this schedule?')) deleteSchedule(ev.id) }}
+                        onClick={() => {
+                          if (window.confirm("Delete this schedule?"))
+                            deleteSchedule(ev.id);
+                        }}
                         className="ml-2 rounded-full border border-[#efccd2] text-[#7d102a] hover:bg-[#f8e7eb] px-3 py-1 text-xs"
                         title="Delete schedule"
                       >

@@ -342,7 +342,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     };
   
     return (
-      <div className="rbc-toolbar" style={{ padding: '8px 0' }}>
+      <div className="rbc-toolbar p-5">
         <div className="rbc-btn-group" style={{ marginRight: 'auto' }}>
           <button
             type="button"
@@ -370,7 +370,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
           </span>
         </div>
         <div className="rbc-btn-group">
-          {['month', 'week', 'day', 'agenda'].map((v) => (
+          {['month', 'week', 'day'].map((v) => (
             <button
               key={v}
               type="button"

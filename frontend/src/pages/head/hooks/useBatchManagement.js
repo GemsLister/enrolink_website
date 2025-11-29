@@ -16,7 +16,7 @@ export function useBatchManagement(token, opts = {}) {
   const [showAdd, setShowAdd] = useState(false)
   const [addValues, setAddValues] = useState({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending', examScore: '' })
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false)
-  const [addBatchValues, setAddBatchValues] = useState({ year: String(new Date().getFullYear()), interviewer: '', status: 'PENDING' })
+  const [addBatchValues, setAddBatchValues] = useState({ name: '', interviewer: '', status: 'ONGOING' })
   const [addBatchLoading, setAddBatchLoading] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [importValues, setImportValues] = useState({ url: '', year: String(new Date().getFullYear()) })
@@ -182,6 +182,18 @@ export function useBatchManagement(token, opts = {}) {
       setBatches(prev => prev.map(b => (b.id === id ? { ...b, status: label } : b)))
     } catch (_) {}
   }
+  const saveBatchEdits = async (batchId, interviewer, statusLabel) => {
+    if (!batchId) return
+    const payload = {}
+    if (typeof interviewer === 'string') payload.interviewer = interviewer
+    if (typeof statusLabel === 'string' && statusLabel) payload.status = (String(statusLabel).toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING')
+    try {
+      const res = await api.put(`/batches/${batchId}`, payload)
+      const doc = res?.doc || {}
+      setBatches(prev => prev.map(b => (b.id === batchId ? { ...b, interviewer: doc.interviewer || interviewer || b.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : b)))
+      setSelectedBatch(prev => prev ? { ...prev, interviewer: doc.interviewer || interviewer || prev.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : prev)
+    } catch (_) {}
+  }
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedBatch(null)
@@ -213,15 +225,16 @@ export function useBatchManagement(token, opts = {}) {
   }
   const handleAddBatch = () => {
     setIsAddBatchOpen(true)
-    setAddBatchValues({ year: String(new Date().getFullYear()), interviewer: '', status: 'PENDING' })
+    setAddBatchValues({ name: '', interviewer: '', status: 'ONGOING' })
   }
   const submitAddBatch = async () => {
-    const year = (addBatchValues.year || '').trim()
-    if (!year) return
+    const codeVal = (addBatchValues.name || '').trim()
+    if (!codeVal) return
     try {
       setAddBatchLoading(true)
       const mappedStatus = String(addBatchValues.status || '').toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING'
-      const payload = { year, interviewer: addBatchValues.interviewer || '', status: mappedStatus }
+      const year = String(new Date().getFullYear())
+      const payload = { code: codeVal, year, interviewer: addBatchValues.interviewer || '', status: mappedStatus }
       const res = await api.post('/batches', payload)
       const b = res?.doc
       if (b) {
@@ -234,12 +247,13 @@ export function useBatchManagement(token, opts = {}) {
   }
 
   const submitAddBatchAndImport = async () => {
-    const year = (addBatchValues.year || '').trim()
-    if (!year) return
+    const codeVal = (addBatchValues.name || '').trim()
+    if (!codeVal) return
     try {
       setAddBatchLoading(true)
       const mappedStatus2 = String(addBatchValues.status || '').toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING'
-      const payload = { year, interviewer: addBatchValues.interviewer || '', status: mappedStatus2 }
+      const year = String(new Date().getFullYear())
+      const payload = { code: codeVal, year, interviewer: addBatchValues.interviewer || '', status: mappedStatus2 }
       const res = await api.post('/batches', payload)
       const b = res?.doc
       if (b) {
@@ -638,5 +652,6 @@ export function useBatchManagement(token, opts = {}) {
     submitImportCsv,
     handleAddStudentSubmit,
     updateBatchStatus,
+    saveBatchEdits,
   }
 }

@@ -53,7 +53,7 @@ export default function BatchFilters({
           <div className="flex items-center gap-4" />
           <div className="flex items-center gap-2">
             {selectedIds.size > 0 && (
-              <button onClick={handleDeleteSelected} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium">Archive ({selectedIds.size})</button>
+              <button onClick={handleDeleteSelected} className="bg-[#E49C9E] text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium">Archive ({selectedIds.size})</button>
             )}
             <button onClick={handleAddBatch} className="bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-900 transition-colors duration-200 font-medium">Add Batch</button>
           </div>

@@ -92,3 +92,61 @@ export async function activity(req, res, next) {
     res.json({ events });
   } catch (e) { next(e); }
 }
+
+export async function pushGa(req, res, next) {
+  try {
+    const Student = getStudentModel();
+    const Batch = getBatchModel();
+    const measurementId = process.env.GA_MEASUREMENT_ID;
+    const apiSecret = process.env.GA_API_SECRET;
+    if (!measurementId || !apiSecret) {
+      return res.status(400).json({ error: 'Missing GA configuration' });
+    }
+    const year = req.query.year ? String(req.query.year) : '';
+    let batchIds = undefined;
+    if (year) {
+      const batchesOfYear = await Batch.find({ year }).select('_id code index').lean();
+      batchIds = batchesOfYear.map(b => b._id);
+    }
+    const match = year
+      ? (batchIds && batchIds.length
+          ? { $or: [ { batchId: { $in: batchIds } }, { batch: year } ] }
+          : { batch: year })
+      : {};
+    const total = await Student.countDocuments(match);
+    const interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    const passed = await Student.countDocuments({ ...match, status: 'PASSED' });
+    const enrolled = await Student.countDocuments({ ...match, status: 'ENROLLED' });
+    const awol = await Student.countDocuments({ ...match, status: 'AWOL' });
+    let batchAnalytics = [];
+    if (batchIds && batchIds.length) {
+      const counts = await Student.aggregate([
+        { $match: { batchId: { $in: batchIds } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]);
+      const countsMap = new Map(counts.map(c => [String(c._id), c.count]));
+      const batches = await Batch.find({ _id: { $in: batchIds } }).sort({ index: 1 }).select('code index').lean();
+      batchAnalytics = batches.map(b => ({ code: b.code, count: countsMap.get(String(b._id)) || 0 }));
+    }
+    const base = interviewed || total || 0;
+    const passRate = base ? Math.round((passed / base) * 100) : 0;
+    const url = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(measurementId)}&api_secret=${encodeURIComponent(apiSecret)}`;
+    const clientId = String(req.user?.id || 'enrolink-head');
+    const events = [];
+    events.push({ name: 'pass_rate', params: { year: year || '', total_applicants: total, interviewed, passed, enrolled, awol, pass_rate: passRate } });
+    for (const b of batchAnalytics) {
+      events.push({ name: 'batch_count', params: { year: year || '', batch_code: b.code, count: b.count } });
+    }
+    const _fetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : (await import('node-fetch')).default;
+    const resp = await _fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, events })
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      return res.status(502).json({ error: 'GA push failed', details: txt });
+    }
+    res.json({ ok: true, pushed: events.length });
+  } catch (e) { next(e); }
+}
