@@ -33,6 +33,15 @@ function shouldEnforceInstitutionalEmails() {
   return !(flag === 'true' || flag === '1' || flag === 'yes')
 }
 
+function prettifyEmailLocalPart(local) {
+  const raw = String(local || '').trim();
+  if (!raw) return '';
+  const replaced = raw.replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
+  const tokens = replaced.split(' ');
+  const titled = tokens.map(t => t ? (t[0].toUpperCase() + t.slice(1).toLowerCase()) : '').join(' ').trim();
+  return titled || (raw[0].toUpperCase() + raw.slice(1).toLowerCase());
+}
+
 export async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -154,18 +163,63 @@ export async function createInvite(req, res, next) {
   try {
     const { email, batch, year, ttlMinutes = 1440 } = req.body;
     if (!email) return next(badRequest('email required'));
+    const em = String(email).trim().toLowerCase();
+
+    // Prevent duplicates: block if already a head or officer user
+    const OfficerUser = getOfficerUserModel();
+    const existingHead = await HeadUser.findOne({ email: em }).lean();
+    if (existingHead) return next(badRequest('Email is already registered'));
+    const existingOfficer = await OfficerUser.findOne({ email: em }).lean();
+    if (existingOfficer) {
+      if (existingOfficer.archived) return next(badRequest('Officer exists in archive; restore instead'));
+      return next(badRequest('Officer already exists'));
+    }
+
+    // Prevent duplicate pending invites (unused and not expired)
+    const now = new Date();
+    const pending = await OfficerInvite.findOne({ email: em, used: false, expiresAt: { $gt: now } }).lean();
+    if (pending) return next(badRequest('An invite is already pending'));
+
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60000);
-    const invite = await OfficerInvite.create({ email, token, batch, year, expiresAt });
+    const invite = await OfficerInvite.create({ email: em, token, batch, year, expiresAt });
     const inviteLink = `${process.env.CLIENT_URL}/signup?token=${invite.token}`;
     let emailed = false;
     try {
-      await sendOfficerInviteEmail(email, inviteLink, ttlMinutes);
+      await sendOfficerInviteEmail(em, inviteLink, ttlMinutes);
       emailed = true;
     } catch (_) {
       // swallow email errors; still return link so head can send manually
     }
     res.json({ inviteLink, emailed });
+  } catch (e) { next(e); }
+}
+
+export async function listInvites(req, res, next) {
+  try {
+    const now = new Date();
+    const rows = await OfficerInvite.find({ used: false, expiresAt: { $gt: now } }).sort({ createdAt: -1 }).lean();
+    res.json({ rows });
+  } catch (e) { next(e); }
+}
+
+export async function cancelInvite(req, res, next) {
+  try {
+    const id = req.params.id;
+    if (!id) return next(badRequest('id required'));
+    const r = await OfficerInvite.findByIdAndDelete(id).lean();
+    if (!r) return next(badRequest('invite not found'));
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+}
+
+export async function getInviteByToken(req, res, next) {
+  try {
+    const token = req.params.token;
+    if (!token) return next(badRequest('token required'));
+    const inv = await OfficerInvite.findOne({ token }).lean();
+    if (!inv) return next(badRequest('invalid invite'));
+    res.json({ email: inv.email, used: !!inv.used, expiresAt: inv.expiresAt });
   } catch (e) { next(e); }
 }
 
@@ -177,7 +231,8 @@ export async function signupWithInvite(req, res, next) {
     if (shouldEnforceInstitutionalEmails() && !isAllowedOfficerEmail(invite.email)) return next(badRequest('Signup restricted to institutional emails'))
     const passwordHash = await bcrypt.hash(password, 10);
     const OfficerUser = getOfficerUserModel();
-    const defaultName = String(invite.email || '').split('@')[0] || '';
+    const localPart = String(invite.email || '').split('@')[0] || '';
+    const defaultName = prettifyEmailLocalPart(localPart);
     const user = await OfficerUser.create({ email: invite.email, passwordHash, role: 'OFFICER', name: defaultName, assignedYear: invite.year, assignedBatch: invite.batch });
     invite.used = true; await invite.save();
     try {
@@ -196,6 +251,7 @@ export async function googleAuth(req, res, next) {
     if (!idToken) return next(badRequest('idToken required'));
     const profile = await verifyIdToken(idToken);
     if (!profile.emailVerified) return next(unauthorized('Email not verified by Google'));
+    const localName = String(profile.email || '').split('@')[0] || '';
 
     // Check both DBs
     let user = await HeadUser.findOne({ email: profile.email });
@@ -214,7 +270,7 @@ export async function googleAuth(req, res, next) {
       const OfficerUser = getOfficerUserModel();
       user = await OfficerUser.create({
         email: profile.email,
-        name: profile.name,
+        name: profile.name || localName,
         role: 'OFFICER',
         assignedYear: invite.year,
         assignedBatch: invite.batch,
@@ -229,10 +285,15 @@ export async function googleAuth(req, res, next) {
       } catch (_) {}
     } else {
       // Existing user can login with Google; ensure provider/googleId are set for convenience
-      if (!inHead && !user.googleId) {
-        user.googleId = profile.googleId;
-        user.provider = 'google';
-        await user.save();
+      if (!inHead) {
+        let changed = false;
+        if (!user.googleId) { user.googleId = profile.googleId; changed = true; }
+        if (user.provider !== 'google') { user.provider = 'google'; changed = true; }
+        if (user.role === 'OFFICER') {
+          const desiredName = profile.name || localName;
+          if (user.name !== desiredName) { user.name = desiredName; changed = true; }
+        }
+        if (changed) await user.save();
       }
     }
 

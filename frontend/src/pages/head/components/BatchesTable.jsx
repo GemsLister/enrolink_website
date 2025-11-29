@@ -14,7 +14,7 @@ export default function BatchesTable({
   getStatusBadge,
   statusOptions = [],
   onChangeStatus,
-  }) {
+}) {
   const fmtDate = (iso) => {
     if (!iso) return ''
     const d = new Date(iso)
@@ -34,6 +34,7 @@ export default function BatchesTable({
           <col style={{ width: '18%' }} />
           <col style={{ width: '18%' }} />
           <col style={{ width: '14%' }} />
+          <col style={{ width: '10%' }} />
         </colgroup>
         <thead className="bg-red-300">
           <tr>
@@ -41,19 +42,22 @@ export default function BatchesTable({
               <input type="checkbox" className="rounded border-gray-300" checked={displayedBatches.length > 0 && allDisplayedSelected} onChange={(e) => toggleAllDisplayed(e.target.checked)} />
             </th>
             <th onClick={() => onHeaderSort('name')} className="px-6 py-4 text-left font-semibold text-gray-800 cursor-pointer select-none">
-              <span className="inline-flex items-center gap-1">Batch ID {sortField==='name' && (<svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir==='asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
+              <span className="inline-flex items-center gap-1">Batch ID {sortField === 'name' && (<svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir === 'asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
             </th>
             <th onClick={() => onHeaderSort('interviewer')} className="px-6 py-4 text-left font-semibold text-gray-800 cursor-pointer select-none">
-              <span className="inline-flex items-center gap-1">Interviewer {sortField==='interviewer' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir==='asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
+              <span className="inline-flex items-center gap-1">Interviewer {sortField === 'interviewer' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir === 'asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
             </th>
             <th onClick={() => onHeaderSort('date')} className="px-6 py-4 text-center font-semibold text-gray-800 cursor-pointer select-none">
-              <span className="inline-flex items-center gap-1">Date Created {sortField==='date' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir==='asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
+              <span className="inline-flex items-center gap-1">Date Created {sortField === 'date' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir === 'asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
             </th>
             <th onClick={() => onHeaderSort('students')} className="px-6 py-4 text-center font-semibold text-gray-800 cursor-pointer select-none">
-              <span className="inline-flex items-center gap-1">Students {sortField==='students' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir==='asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
+              <span className="inline-flex items-center gap-1">Students {sortField === 'students' && (<svg className="w-3 h-3 inline" viewBox="0 0 20 20" fill="currentColor"><path d={sortDir === 'asc' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>)}</span>
             </th>
             <th className="px-6 py-4 text-left font-semibold text-gray-800">
               <span className="inline-flex items-center gap-1">Status</span>
+            </th>
+            <th className="px-6 py-4 text-left font-semibold text-gray-800">
+              <span className="inline-flex items-center gap-1">Edit</span>
             </th>
           </tr>
         </thead>
@@ -61,11 +65,15 @@ export default function BatchesTable({
           {batchesLoading && (<tr><td colSpan={6} className="px-6 py-6 text-center text-gray-600">Loading batches…</td></tr>)}
           {!batchesLoading && displayedBatches.length === 0 && (<tr><td colSpan={6} className="px-6 py-10 text-center text-gray-600">No batches found</td></tr>)}
           {!batchesLoading && displayedBatches.map((batch, index) => (
-            <tr key={batch.id} className={`border-b border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} onClick={() => handleRowClick(batch)}>
+            <tr key={batch.id} className={`border-b border-gray-100 hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
               <td className="px-6 py-4">
                 <input type="checkbox" className="rounded border-gray-300" checked={selectedIds.has(batch.id)} onChange={(e) => toggleRow(batch.id, e.target.checked)} onClick={(e) => e.stopPropagation()} />
               </td>
-              <td className="px-6 py-4 text-gray-800 font-medium truncate">{batch.code}</td>
+              <td className="px-6 py-4 text-gray-800 font-medium truncate">
+                <div className="inline-flex items-center gap-2">
+                  <span>{batch.code}</span>
+                </div>
+              </td>
               <td className="px-6 py-4 text-gray-600 truncate">{batch.interviewer}</td>
               <td className="px-6 py-4 text-gray-600 truncate text-center">{fmtDate(batch.createdAt)}</td>
               <td className="px-6 py-4 text-gray-600 truncate text-center">{batch.studentsCount}</td>
@@ -77,6 +85,19 @@ export default function BatchesTable({
                     ))}
                   </select>
                 </div>
+              </td>
+              <td className='px-6 py-4'>
+                <button
+                  type="button"
+                  onClick={() => handleRowClick(batch)}
+                  className="flex justify-center p-1 rounded-[10px] border border-gray-300 hover:bg-gray-100 text-gray-700"
+                  aria-label="Edit batch"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
               </td>
             </tr>
           ))}

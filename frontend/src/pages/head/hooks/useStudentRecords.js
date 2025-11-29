@@ -140,7 +140,13 @@ export function useStudentRecords(token) {
     async function load() {
       try {
         setStudentsLoading(true)
-        const res = await api.get('/students')
+        const params = {}
+        // Add any additional query parameters here if needed
+        const queryString = Object.keys(params)
+          .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+          .join('&')
+        const url = `/students${queryString ? `?${queryString}` : ''}`
+        const res = await api.get(url)
         const rows = (res?.rows || []).map((s) => ({
           id: s._id,
           __v: typeof s.__v === 'number' ? s.__v : undefined,
@@ -175,7 +181,8 @@ export function useStudentRecords(token) {
             }))
           }
         } catch (_) {}
-      } catch (_) {
+      } catch (error) {
+        console.error('Error loading students:', error)
       } finally { if (mounted) setStudentsLoading(false) }
     }
     load()

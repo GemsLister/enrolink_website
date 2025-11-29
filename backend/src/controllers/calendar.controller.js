@@ -157,6 +157,45 @@ export async function list(req, res, next) {
           console.error('Error syncing events to database:', syncError);
         }
       }
+
+      // If Google returned events successfully, remove any database events (for this user)
+      // that were previously synced to Google but no longer exist there within the same range.
+      // This ensures deletions done directly in Google Calendar propagate to the local database.
+      if (userId) {
+        try {
+          const googleIds = new Set((events || []).map(ev => ev.id).filter(Boolean));
+          const deletionQuery = {
+            user: userId,
+            googleEventId: { $exists: true, $ne: null }
+          };
+          // Apply time range filters if provided (same logic as fetchDatabaseEvents)
+          const startRange = {};
+          const endRange = {};
+          if (timeMin) {
+            const s = new Date(timeMin);
+            if (!isNaN(s)) startRange.$gte = s;
+          }
+          if (timeMax) {
+            const e = new Date(timeMax);
+            if (!isNaN(e)) endRange.$lte = e;
+          }
+          if (Object.keys(startRange).length) deletionQuery.start = startRange;
+          if (Object.keys(endRange).length) deletionQuery.end = endRange;
+
+          const candidates = await Event.find(deletionQuery).select('_id googleEventId title').lean();
+          const toDelete = candidates.filter(doc => !googleIds.has(doc.googleEventId));
+          for (const doc of toDelete) {
+            try {
+              await Event.deleteOne({ _id: doc._id, user: userId });
+              console.log(`Deleted local event ${doc._id} (${doc.title}) because Google event ${doc.googleEventId} is missing`);
+            } catch (delErr) {
+              console.error('Failed to delete local event during Google sync deletion:', { id: doc._id, err: delErr });
+            }
+          }
+        } catch (pruneErr) {
+          console.error('Error pruning deleted Google events from database:', pruneErr);
+        }
+      }
       
       // Get events from database that might not be in Google Calendar
       // This includes events that were created in the app or events that exist in DB but not in Google Calendar
@@ -177,8 +216,8 @@ export async function list(req, res, next) {
         }
       });
       
-      // Add database events that don't exist in Google Calendar
-      // This handles cases where events exist in database but were deleted from Google Calendar
+      // Add database-only events that don't exist in Google Calendar
+      // (Events without googleEventId remain visible even if not in Google, e.g., offline or failed sync)
       dbEvents.forEach(dbEvent => {
         if (dbEvent.id && !googleEventMap.has(dbEvent.id)) {
           // Event exists in database but not in Google Calendar - include it

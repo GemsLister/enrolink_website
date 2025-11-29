@@ -16,6 +16,20 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [captcha, setCaptcha] = useState('')
   const navigate = useNavigate()
+  
+  // Load email from invite token
+  useState(() => {
+    let active = true
+    async function load() {
+      try {
+        if (!inviteToken) return
+        const res = await api.request('GET', `/api/auth/invite/${inviteToken}`)
+        if (active) setEmail(res.email || '')
+      } catch (_) {}
+    }
+    load()
+    return () => { active = false }
+  }, [])
 
   async function onSubmit(e) {
     e.preventDefault()
@@ -54,7 +68,7 @@ export default function Signup() {
         <div className="text-center text-xs text-[#5b5c60]">OR SIGN UP WITH EMAIL</div>
         <div className="space-y-1">
           <label className="text-sm">Email</label>
-          <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="(from invite)" disabled className="w-full border-b border-[#e2e2e2] bg-gray-50 py-2" />
+          <input type="email" value={email} readOnly className="w-full border-b border-[#e2e2e2] bg-gray-50 py-2" />
         </div>
         <div className="space-y-1">
           <label className="text-sm">Password</label>

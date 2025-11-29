@@ -50,8 +50,18 @@ const request = async (method, url, options = {}) => {
 		...(options.headers || {})
 	};
 
-	// Build URL with query params
-    let fullUrl = url.startsWith('http') ? url : `${BASE}${url}`;
+    // Build URL with query params
+    // Calendar routes use /calendar directly; explicit /api is respected; otherwise prefix with BASE
+    let fullUrl;
+    if (url.startsWith('http')) {
+        fullUrl = url;
+    } else if (url.startsWith('/calendar')) {
+        fullUrl = url;
+    } else if (url.startsWith('/api')) {
+        fullUrl = url;
+    } else {
+        fullUrl = `${BASE}${url}`;
+    }
 	if (params) {
 		const queryString = new URLSearchParams(params).toString();
 		fullUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${queryString}`;

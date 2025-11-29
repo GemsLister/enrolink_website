@@ -3,7 +3,19 @@ import { getOfficerUserModel } from '../models/User.js';
 export async function list(req, res, next) {
   try {
     const User = getOfficerUserModel();
-    const rows = await User.find({ role: 'OFFICER', archived: { $ne: true } }).lean();
+    let rows = await User.find({ role: 'OFFICER', archived: { $ne: true } }).lean();
+    rows = rows.map(r => {
+      const em = String(r.email || '');
+      const local = em.includes('@') ? em.split('@')[0] : em;
+      const hasSpaces = /\s/.test(String(r.name || ''));
+      const looksRaw = String(r.name || '').toLowerCase() === local.toLowerCase();
+      if (!hasSpaces || looksRaw) {
+        const pretty = local.replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim()
+          .split(' ').map(t => t ? (t[0].toUpperCase() + t.slice(1).toLowerCase()) : '').join(' ').trim();
+        r.name = pretty || r.name;
+      }
+      return r;
+    });
     res.json({ rows });
   } catch (e) { next(e); }
 }
@@ -26,7 +38,19 @@ export async function update(req, res, next) {
 export async function interviewers(req, res, next) {
   try {
     const User = getOfficerUserModel();
-    const rows = await User.find({ role: 'OFFICER', canInterview: true }).select('_id name email').lean();
+    let rows = await User.find({ role: 'OFFICER', canInterview: true }).select('_id name email').lean();
+    rows = rows.map(r => {
+      const em = String(r.email || '');
+      const local = em.includes('@') ? em.split('@')[0] : em;
+      const hasSpaces = /\s/.test(String(r.name || ''));
+      const looksRaw = String(r.name || '').toLowerCase() === local.toLowerCase();
+      if (!hasSpaces || looksRaw) {
+        const pretty = local.replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim()
+          .split(' ').map(t => t ? (t[0].toUpperCase() + t.slice(1).toLowerCase()) : '').join(' ').trim();
+        r.name = pretty || r.name;
+      }
+      return r;
+    });
     res.json({ rows });
   } catch (e) { next(e); }
 }

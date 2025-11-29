@@ -15,6 +15,7 @@ export default function EnrollmentOfficers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [officers, setOfficers] = useState([]);
+  const [archivedOfficers, setArchivedOfficers] = useState([]);
   const [selectedOfficers, setSelectedOfficers] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [query, setQuery] = useState("");
@@ -99,6 +100,14 @@ export default function EnrollmentOfficers() {
         if (mounted) setOfficers([]);
       }
     }
+    async function loadArchived() {
+      try {
+        const res = await api.officersArchivedList(token);
+        if (mounted) setArchivedOfficers(res.rows || []);
+      } catch (_) {
+        if (mounted) setArchivedOfficers([]);
+      }
+    }
     async function loadBatches() {
       try {
         const res = await api.batchesList(token);
@@ -110,6 +119,7 @@ export default function EnrollmentOfficers() {
     if (token) {
       load();
       loadBatches();
+      loadArchived();
     }
     return () => {
       mounted = false;
@@ -122,7 +132,18 @@ export default function EnrollmentOfficers() {
     const em = email.trim().toLowerCase();
     if (!em) {
       setError("Email is required");
-      return;
+      return false;
+    }
+    // Prevent inviting an email that's already an officer
+    const exists = officers.some((o) => String(o.email || '').toLowerCase() === em);
+    const archivedExists = archivedOfficers.some((o) => String(o.email || '').toLowerCase() === em);
+    if (exists) {
+      setError('Officer already exists');
+      return false;
+    }
+    if (archivedExists) {
+      setError('Officer exists in archive; restore instead');
+      return false;
     }
     try {
       setLoading(true);
@@ -145,11 +166,13 @@ export default function EnrollmentOfficers() {
       } catch (_) { }
       // refresh pending invites list silently
       try { await loadInvites({ silent: true }); } catch (_) {}
+      return true;
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
+    return false;
   }
 
   async function loadInvites({ silent } = {}) {
@@ -208,6 +231,9 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user || user.role !== "DEPT_HEAD") return <Navigate to="/" replace />;
+
+  const duplicateOfficer = officers.some(o => String(o.email || '').toLowerCase() === String(email || '').trim().toLowerCase());
+  const duplicateArchivedOfficer = archivedOfficers.some(o => String(o.email || '').toLowerCase() === String(email || '').trim().toLowerCase());
 
   return (
     <div className="flex">
@@ -353,9 +379,17 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
               </div>
               {error && <div className="text-sm text-red-700 mb-2">{error}</div>}
               <div className="grid gap-4">
-                <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                <div className="grid grid-cols-[100px_1fr] items-center gap-1">
                   <label className="text-white font-semibold text-sm text-left">Gmail</label>
-                  <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+                  <div>
+                    <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+                    {duplicateOfficer && (
+                      <div className="text-xs text-red-700 mt-1">Officer already exists</div>
+                    )}
+                    {!duplicateOfficer && duplicateArchivedOfficer && (
+                      <div className="text-xs text-red-700 mt-1">Officer exists in archive; restore instead</div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] items-center gap-4">
                   <label className="text-white font-semibold text-sm text-left">Assign Batch</label>
@@ -367,7 +401,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                   </select>
                 </div>
                 <div className="mt-2">
-                  <button onClick={async ()=>{ await invite(); setShowAddModal(false); }} disabled={loading || !email.trim()} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
+                  <button onClick={async ()=>{ const ok = await invite(); if (ok) setShowAddModal(false); }} disabled={loading || !email.trim() || duplicateOfficer || duplicateArchivedOfficer} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
                 </div>
               </div>
             </div>

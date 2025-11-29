@@ -11,6 +11,12 @@ export default function StudentDetailsModal({
   handleEditSave,
 }) {
   if (!isOpen || !selectedStudent) return null
+  const prettyName = (s) => {
+    const raw = String(s || '').trim()
+    if (!raw) return ''
+    const replaced = raw.replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim()
+    return replaced.split(' ').map(t => (t ? (t[0].toUpperCase() + t.slice(1).toLowerCase()) : '')).join(' ').trim() || raw
+  }
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
       <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[600px] p-7 mx-auto border-2 border-[#6b2b2b]">
@@ -139,7 +145,7 @@ export default function StudentDetailsModal({
               <div className="relative">
                 <input
                   type="text"
-                  value={isEditing && formValues ? formValues.interviewer : selectedStudent.interviewer}
+                  value={isEditing && formValues ? formValues.interviewer : prettyName(selectedStudent.interviewer)}
                   onChange={(e) => setFormValues(prev => ({...prev, interviewer: e.target.value}))}
                   className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-red-400 shadow-sm"
                   readOnly={!isEditing}

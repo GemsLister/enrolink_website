@@ -13,6 +13,9 @@ r.put('/officer/me', auth, requireRole('OFFICER'), authController.officerUpdateM
 r.post('/officer/change-password', auth, requireRole('OFFICER'), authController.officerChangePassword);
 r.get('/export', auth, requireRole('DEPT_HEAD'), authController.exportData);
 r.post('/invite', auth, requireRole('DEPT_HEAD'), authController.createInvite);
+r.get('/invites', auth, requireRole('DEPT_HEAD'), authController.listInvites);
+r.delete('/invites/:id', auth, requireRole('DEPT_HEAD'), authController.cancelInvite);
+r.get('/invite/:token', authController.getInviteByToken);
 r.post('/signup-with-invite', authController.signupWithInvite);
 r.post('/google', authController.googleAuth);
 r.post('/request-password-reset', authController.requestPasswordReset);

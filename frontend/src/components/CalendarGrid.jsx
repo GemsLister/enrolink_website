@@ -138,14 +138,19 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     try {
       switch (view) {
         case "month":
+          // Include entire month: timeMin at start of first day, timeMax exclusive at first day of next month
           start.setDate(1);
+          start.setHours(0,0,0,0);
+          end = new Date(start);
           end.setMonth(end.getMonth() + 1);
-          end.setDate(0);
+          // timeMax is exclusive, so use first day of next month at 00:00
           break;
         case "week":
+          // Include 7-day window; timeMax exclusive at start + 7 days
           start.setDate(start.getDate() - start.getDay());
+          start.setHours(0,0,0,0);
           end = new Date(start);
-          end.setDate(start.getDate() + 6);
+          end.setDate(start.getDate() + 7);
           break;
         case "day":
           end = new Date(start);
@@ -340,6 +345,24 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     const handleNavigate = (action) => {
       onNavigate(action);
     };
+    const handleSync = async () => {
+      try {
+        if (!token) {
+          setError('Authentication required');
+          return;
+        }
+        setError('');
+        setLoading(true);
+        const result = await api.calendarPushToGoogle(token);
+        console.log('Push to Google result:', result);
+        updateEventsForView(currentView, currentDate, { silent: true });
+      } catch (e) {
+        console.error('Failed to push events to Google:', e);
+        setError(e.message || 'Failed to push events to Google Calendar');
+      } finally {
+        setLoading(false);
+      }
+    };
   
     return (
       <div className="rbc-toolbar p-5">
@@ -380,6 +403,14 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
+          <button
+            type="button"
+            className="rbc-btn"
+            onClick={handleSync}
+            style={{ marginLeft: '8px' }}
+          >
+            Sync to Google
+          </button>
         </div>
       </div>
     );

@@ -18,6 +18,14 @@ const toDateTimeInput = (value) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const addOneDayStr = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d?.getTime?.())) return ''
+  d.setDate(d.getDate() + 1)
+  return toDateInput(d)
+}
+
 export default function ScheduleCreateModal({ open, onClose, onCreated, calendarId, initial }) {
   const { token } = useAuth()
   const [summary, setSummary] = useState('')
@@ -68,15 +76,15 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
       const startIso = allDay ? null : parseDate(start)
       const endIso = allDay ? null : parseDate(end)
 
-      if (!allDay && (!startIso || !endIso)) {
-        throw new Error('Invalid start or end date/time')
-      }
+  if (!allDay && (!startIso || !endIso)) {
+    throw new Error('Invalid start or end date/time')
+  }
 
-      const body = allDay
-        ? { summary, description, start: { date: allDayStart }, end: { date: allDayEnd } }
-        : { summary, description, start: { dateTime: startIso }, end: { dateTime: endIso } }
-      // Prepare the event data with all fields
-      const eventData = {
+  const body = allDay
+    ? { summary, description, start: { date: allDayStart }, end: { date: addOneDayStr(allDayEnd || allDayStart) } }
+    : { summary, description, start: { dateTime: startIso }, end: { dateTime: endIso } }
+  // Prepare the event data with all fields
+  const eventData = {
         ...body,
         location: location || undefined,
         attendees: attendees 
@@ -144,12 +152,10 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
               type="checkbox" 
               checked={allDay} 
               onChange={(e) => {
-                const newAllDayValue = e.target.checked;
-                setAllDay(newAllDayValue);
-                // When enabling all day, set end date same as start date
+                const newAllDayValue = e.target.checked
+                setAllDay(newAllDayValue)
                 if (newAllDayValue && start) {
-                  // Use setTimeout to ensure state is updated
-                  setTimeout(() => setEnd(start), 0);
+                  setTimeout(() => setEnd(addOneDayStr(start)), 0)
                 }
               }} 
             />
@@ -162,11 +168,10 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
                 type={allDay ? 'date' : 'datetime-local'} 
                 value={start} 
                 onChange={(e) => {
-                  const newStart = e.target.value;
-                  setStart(newStart);
-                  // If in allDay mode, update end to match start
+                  const newStart = e.target.value
+                  setStart(newStart)
                   if (allDay) {
-                    setEnd(newStart);
+                    setEnd(addOneDayStr(newStart))
                   }
                 }} 
                 className="w-full h-9 rounded-md bg-white px-3 text-[13px] text-[#2f2b33] outline-none focus:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]" 
