@@ -50,9 +50,9 @@ export default function OfficerSettings() {
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
 
   return (
-    <div className="flex">
+    <div className="min-h-screen flex">
       <OfficerSidebar />
-      <main className="flex-1 bg-gray-50 px-8 pt-8 pb-4 overflow-y-auto h-[100dvh]">
+      <main className="flex-1 bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 overflow-y-auto">
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-5xl font-bold text-red-900 mb-2 mt-[35px]">SETTINGS</h1>

@@ -70,7 +70,7 @@ export default function HeadSidebar() {
   }
 
   return (
-    <aside className="flex flex-col h-full w-80 bg-gradient-to-b from-red-300 to-pink-100">
+    <aside className="flex flex-col min-h-screen w-80 bg-gradient-to-b from-red-300 to-pink-100">
       <div className="p-8 flex justify-center overflow-visible">
         <Link to={'/head'}>
           <img

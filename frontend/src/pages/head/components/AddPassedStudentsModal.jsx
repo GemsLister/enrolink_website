@@ -7,6 +7,7 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
   const api = useApi(token)
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState([])
+  const [existingIds, setExistingIds] = useState(new Set())
   const [selected, setSelected] = useState(new Set())
   const [query, setQuery] = useState('')
 
@@ -20,6 +21,7 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
         const all = (sres?.rows || []).map((s) => ({
           id: String(s._id || s.id || ''),
           firstName: s.firstName || '',
+          middleName: s.middleName || '',
           lastName: s.lastName || '',
           email: s.email || '',
           contact: s.contact || '',
@@ -29,8 +31,28 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
           batch: s.batch || '',
           interviewDate: s.interviewDate || '',
         }))
-        const passedOnly = all.filter((r) => r.interviewerDecision === 'PASSED' && r.batchId !== (selectedBatch?.id || ''))
-        if (active) setRows(passedOnly)
+        let already = new Set()
+        let alreadyEmails = new Set()
+        let alreadyNames = new Set()
+        try {
+          const mres = await api.get(`/batches/${selectedBatch?.id}/students`)
+          const members = (mres?.rows || [])
+          already = new Set(members.map((m) => String(m._id || m.id || '')))
+          alreadyEmails = new Set(members.map((m) => String(m.email || '').trim().toLowerCase()).filter(Boolean))
+          const norm = (a,b) => `${String(a||'').trim().toLowerCase()}|${String(b||'').trim().toLowerCase()}`
+          alreadyNames = new Set(members.map((m)=>norm(m.lastName, m.firstName)))
+        } catch (_) { already = new Set() }
+        const norm = (a,b) => `${String(a||'').trim().toLowerCase()}|${String(b||'').trim().toLowerCase()}`
+        const passedOnly = all.filter((r) => {
+          if (r.interviewerDecision !== 'PASSED') return false
+          if (r.batchId === (selectedBatch?.id || '')) return false
+          if (already.has(r.id)) return false
+          const em = String(r.email || '').trim().toLowerCase()
+          if (em && alreadyEmails.has(em)) return false
+          if (alreadyNames.has(norm(r.lastName, r.firstName))) return false
+          return true
+        })
+        if (active) { setRows(passedOnly); setExistingIds(already) }
       } catch (_) {
         if (active) setRows([])
       } finally {
@@ -71,11 +93,14 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
     const ids = Array.from(selected)
     if (!ids.length) return
     try {
+      const newlyAdded = new Set()
       for (const id of ids) {
+        if (existingIds.has(id)) continue
         const s = rows.find((r) => r.id === id)
         if (!s) continue
         const payload = {
           firstName: s.firstName,
+          middleName: s.middleName,
           lastName: s.lastName,
           status: 'PASSED',
           batchId: selectedBatch.id,
@@ -86,8 +111,11 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
           ...(s.interviewDate ? { interviewDate: s.interviewDate } : {}),
         }
         await api.post('/students', payload)
+        newlyAdded.add(id)
       }
       setSelected(new Set())
+      setExistingIds(prev => new Set([...prev, ...Array.from(newlyAdded)]))
+      setRows(prev => prev.filter(r => !newlyAdded.has(r.id)))
       if (onAdded) onAdded()
       onClose()
     } catch (_) {}

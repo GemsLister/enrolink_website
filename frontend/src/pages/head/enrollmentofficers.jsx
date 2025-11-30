@@ -25,6 +25,7 @@ export default function EnrollmentOfficers() {
   const [officerToArchive, setOfficerToArchive] = useState(null);
   const [showBulkArchiveModal, setShowBulkArchiveModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
   const [invites, setInvites] = useState([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState("");
@@ -244,9 +245,6 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
             <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">ENROLLMENT OFFICERS</h1>
             <p className="text-lg text-[#2f2b33] mt-3">List of current enrollment officers</p>
           </div>
-          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 mt-[-30px] border-2 border-[#6b2b2b]">
-            <button onClick={() => setShowAddModal(true)} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Add Officer</button>
-          </div>
         </div>
 
         <div className="flex items-center gap-4 mb-4">
@@ -265,15 +263,49 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
             </span>
           </div>
           <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border border-[#e4b7bf] text-[#8a1d35] bg-white hover:bg-[#fff5f7]">Pending invites</button>
+          <div className="relative">
+            <button type="button" onClick={() => setShowNotif(v => !v)} className="flex items-center justify-center w-9 h-9 rounded-full bg-white text-[#2f2b33] border border-[#efccd2] hover:bg-[#fff5f7]">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+            </button>
+            {showNotif && (
+              <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#efccd2] bg-white shadow-2xl text-sm text-[#5b1a30] z-[1000]">
+                <div className="px-4 py-2 border-b border-[#f3d9de] font-semibold text-xs text-[#7d102a]">Notifications</div>
+                <ul className="max-h-64 overflow-auto py-1">
+                  {(() => {
+                    const now = Date.now();
+                    const recent = (officers || []).filter(o => {
+                      const t = new Date(o.createdAt || 0).getTime();
+                      if (!t) return false;
+                      const diffDays = (now - t) / (1000 * 60 * 60 * 24);
+                      return diffDays <= 7;
+                    });
+                    if (!recent.length) return (<li className="px-4 py-3 text-[#8c7f86]">No recent acceptances</li>);
+                    return recent.map(o => (
+                      <li key={o._id} className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
+                        <div className="w-7 h-7 rounded-full bg-[#f2c6cf] text-[#8a1d35] flex items-center justify-center text-[10px] font-semibold">OK</div>
+                        <div className="flex-1">
+                          <div className="font-semibold">{o.name || o.email || '-'}</div>
+                          <div className="text-xs text-[#8b4a5d]">Accepted invite {timeAgo(o.createdAt)}</div>
+                        </div>
+                      </li>
+                    ));
+                  })()}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-[13px] border border-[#efccd2] p-0 overflow-hidden">
-          <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3">Current Officers</div>
+          <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3 flex items-center justify-between">
+            <span>Current Officers</span>
+            <button onClick={() => setShowAddModal(true)} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Add Officer</button>
+          </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-12 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
                       className="h-4 w-4 text-[#6b0000] focus:ring-[#6b0000] border-gray-300 rounded"
@@ -284,12 +316,12 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="py-2 px-3">Name</th>
-                  <th className="py-2 px-3">Email</th>
-                  <th className="py-2 px-3">Batch</th>
-                  <th className="py-2 px-3">Contact #</th>
-                  <th className="py-2 px-3">Date Created</th>
-                  <th className="py-2 px-3">Actions</th>
+                  <th className="w-56 text-left py-2 px-3 text-xs font-medium text-gray-700">Name</th>
+                  <th className="w-64 text-left py-2 px-3 text-xs font-medium text-gray-700">Email</th>
+                  <th className="w-32 text-left py-2 px-3 text-xs font-medium text-gray-700">Batch</th>
+                  <th className="w-40 text-left py-2 px-3 text-xs font-medium text-gray-700">Contact #</th>
+                  <th className="w-32 text-left py-2 px-3 text-xs font-medium text-gray-700">Date Created</th>
+                  <th className="w-32 text-right py-2 px-3 text-xs font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -311,7 +343,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                     className={`hover:bg-gray-50 ${selectedOfficers.includes(officer._id) ? "bg-blue-50" : ""
                       }`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="w-12 px-4 py-3 text-center align-middle whitespace-nowrap">
                       <input
                         type="checkbox"
                         className="h-4 w-4 text-[#6b0000] focus:ring-[#6b0000] border-gray-300 rounded"
@@ -319,23 +351,23 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                         onChange={() => toggleOfficerSelection(officer._id)}
                       />
                     </td>
-                    <td className="py-2 px-3 text-gray-800">
+                    <td className="w-56 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
                       {officer.name || "-"}
                     </td>
-                    <td className="py-2 px-3 text-gray-800">{officer.email}</td>
-                    <td className="py-2 px-3 text-gray-800">
+                    <td className="w-64 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">{officer.email}</td>
+                    <td className="w-32 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
                       {(() => {
                         const b = batches.find((x) => x._id === officer.assignedBatch) || batches.find((x)=> x.code === officer.assignedBatch);
                         return b ? (b.code || b.name) : '-';
                       })()}
                     </td>
-                    <td className="py-2 px-3 text-gray-800">{officer.contact || '-'}</td>
-                    <td className="py-2 px-3 text-gray-800">
+                    <td className="w-40 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">{officer.contact || '-'}</td>
+                    <td className="w-32 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
                       {officer.createdAt
                         ? new Date(officer.createdAt).toLocaleDateString()
                         : "-"}
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="w-32 py-2 px-3 text-right align-middle whitespace-nowrap">
                       <button
                         onClick={() => { setOfficerToArchive(officer); setShowArchiveModal(true); }}
                         className="bg-white text-[#6b0000] border border-[#6b2b2b] px-3 py-1 rounded-full hover:bg-pink-50 transition-colors duration-200 text-xs"

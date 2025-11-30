@@ -58,6 +58,8 @@ export default function OfficerDashboard() {
   const [selectedScheduleIds, setSelectedScheduleIds] = useState([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [assignedLabel, setAssignedLabel] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -124,6 +126,38 @@ export default function OfficerDashboard() {
   }, [token])
 
   useEffect(() => {
+    let alive = true
+    async function loadAssigned() {
+      try {
+        if (!token || !user?.email) return
+        const res = await api.officersList(token)
+        const me = (res?.rows || []).find(o => String(o.email || '').toLowerCase() === String(user.email || '').toLowerCase())
+        if (!me) return
+        let label = ''
+        if (me.assignedBatch) {
+          try {
+            const bres = await api.batchesList(token)
+            const b = (bres?.rows || []).find(x => (x._id === me.assignedBatch) || (x.code === me.assignedBatch))
+            label = b ? (b.code || b.name || '') : (me.assignedBatch || '')
+          } catch (_) {
+            label = me.assignedBatch || ''
+          }
+        }
+        const prev = localStorage.getItem('assigned_batch_label') || ''
+        if (alive) {
+          setAssignedLabel(label)
+          if (label && prev && prev !== label) {
+            localStorage.setItem('assigned_batch_updated', '1')
+          }
+          if (label) localStorage.setItem('assigned_batch_label', label)
+        }
+      } catch (_) {}
+    }
+    loadAssigned()
+    return () => { alive = false }
+  }, [token, user])
+
+  useEffect(() => {
     if (!gcal.length && selectedScheduleIds.length) {
       setSelectedScheduleIds([])
       return
@@ -144,6 +178,14 @@ export default function OfficerDashboard() {
   ]
 
   const batches = stats.batchAnalytics || []
+  const FALLBACK_BATCHES = [
+    { code: '2025-A', count: 80 },
+    { code: '2025-B', count: 120 },
+    { code: '2025-C', count: 180 },
+    { code: '2025-D', count: 50 },
+    { code: '2025-E', count: 75 },
+    { code: '2025-F', count: 30 },
+  ]
 
   const passRate = useMemo(() => {
     const base = totals.interviewed || totals.totalApplicants || 0
@@ -227,11 +269,11 @@ export default function OfficerDashboard() {
 
   return (
     <div className="min-h-screen flex bg-white">
-      <aside className="w-80 shrink-0">
+      <aside className="hidden lg:block w-80 shrink-0">
         <OfficerSidebar />
       </aside>
-      <div className="flex-1 grid grid-cols-[1fr_360px]">
-        <main className="bg-[#f7f1f2] px-10 py-8">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
+        <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
           <p className="mt-3 flex items-center gap-2 text-sm text-[#6e2a39]">
             <span>Showing for:</span>
@@ -252,48 +294,40 @@ export default function OfficerDashboard() {
           </section>
           <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Counts: Pass vs Fail</h2>
+              <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
               {(() => {
-                const base = totals.interviewed || totals.totalApplicants || 0
-                const rows = [
-                  { label: 'Failed', value: Math.max(0, base - Number(totals.passedInterview || 0)), color: '#7d102a' },
-                  { label: 'Passed', value: Number(totals.passedInterview || 0), color: '#f4c3ce' },
-                ]
-                if (!base) return (<div className="mt-5 text-sm text-[#a86a74]">No data for the selected school year.</div>)
+                const rows = (batches && batches.length ? batches : FALLBACK_BATCHES).map((b) => [String(b.code || b.label || '—'), Number(b.count ?? b.value ?? 0)])
+                const data = [["Batch", "Count"], ...rows]
                 return (
-                  <div className="mt-4 flex flex-col gap-3">
-                    {rows.map((r) => {
-                      const pct = Math.max(0, Math.min(100, Math.round((r.value / base) * 100)))
-                      return (
-                        <div key={r.label} className="grid grid-cols-[1fr_80px] items-center gap-4">
-                          <div className="flex items-center gap-3">
-                            <span className="w-20 text-sm text-[#7d102a]">{r.label}</span>
-                            <div className="flex-1 h-4 rounded-full bg-[#f2f4f7]">
-                              <div className="h-4 rounded-full" style={{ width: `${pct}%`, background: r.color }} />
-                            </div>
-                          </div>
-                          <div className="text-right text-sm text-[#7d102a] font-semibold">{r.value}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <QuickChart
+                    type="BarChart"
+                    className="mt-4"
+                    style={{ width: '100%', height: 'auto' }}
+                    data={data}
+                    options={{
+                      backgroundColor: 'transparent',
+                      legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                      slices: { 0: { color: '#7d102a' } },
+                    }}
+                    engine="quickchart"
+                  />
                 )
               })()}
             </div>
             <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
               <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
-              <div className="mt-6 flex flex-col items-center gap-5">
-                <div className="relative flex items-center justify-center rounded-full" style={{ width:'220px', height:'220px', background:`conic-gradient(#7d102a 0% ${passRate.failed}%, #f4c3ce ${passRate.failed}% 100%)` }}>
-                  <div className="absolute flex h-[150px] w-[150px] flex-col items-center justify-center rounded-full bg-white text-center border border-[#efccd2]">
-                    <span className="text-4xl font-extrabold text-[#7d102a]">{passRate.passed}%</span>
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-[#a86a74]">Passed</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 text-sm text-[#7d102a]">
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#7d102a]" /><span>Failed {passRate.failed}%</span></div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#f4c3ce]" /><span>Passed {passRate.passed}%</span></div>
-                </div>
-              </div>
+              <QuickChart
+                type="PieChart"
+                className="mt-4"
+                style={{ width: '100%', height: 'auto' }}
+                data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
+                options={{
+                  backgroundColor: 'transparent',
+                  legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                  slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
+                }}
+                engine="quickchart"
+              />
             </div>
           </section>
           {/* Google Calendar UI */}
@@ -313,7 +347,7 @@ export default function OfficerDashboard() {
             />
           )}
         </main>
-        <aside className="border-l border-[#efccd2] bg-[#fbf3f4] px-6 py-8">
+        <aside className="bg-[#fbf3f4] px-4 py-6 sm:px-6 lg:px-6 lg:py-8 lg:border-l lg:border-[#efccd2]">
           {/* Simplified right column for officers; mirrors head */}
           <div className="rounded-3xl bg-gradient-to-b from-[#efc4cd] to-[#f5d8de] p-5 shadow-[0_14px_28px_rgba(139,23,47,0.08)]">
             <div className="flex items-center justify-between">
@@ -332,6 +366,46 @@ export default function OfficerDashboard() {
                     </svg>
                   </div>
                 </span>
+              </div>
+              <div className="relative">
+                <button type="button" onClick={() => setNotifOpen(v => !v)} className="flex items-center justify-center w-9 h-9 rounded-full bg-white text-[#2f2b33] border border-[#efccd2] hover:bg-[#fff5f7]">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+                </button>
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-[#efccd2] bg-white shadow-2xl text-sm text-[#5b1a30] z-[1000]">
+                    <div className="px-4 py-2 border-b border-[#f3d9de] font-semibold text-xs text-[#7d102a]">Notifications</div>
+                    <ul className="max-h-56 overflow-auto py-1">
+                      {assignedLabel ? (
+                        (() => {
+                          const updated = localStorage.getItem('assigned_batch_updated') === '1'
+                          if (updated) localStorage.removeItem('assigned_batch_updated')
+                          return (
+                            <>
+                              {updated && (
+                                <li className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
+                                  <div className="w-7 h-7 rounded-full bg-[#f2c6cf] text-[#8a1d35] flex items-center justify-center text-[10px] font-semibold">UPD</div>
+                                  <div className="flex-1">
+                                    <div className="font-semibold">Batch updated</div>
+                                    <div className="text-xs text-[#8b4a5d]">You are now assigned to {assignedLabel}</div>
+                                  </div>
+                                </li>
+                              )}
+                              <li className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
+                                <div className="w-7 h-7 rounded-full bg-[#f0d9dd] text-[#b0475c] flex items-center justify-center text-[10px] font-semibold">INF</div>
+                                <div className="flex-1">
+                                  <div className="font-semibold">Assigned batch</div>
+                                  <div className="text-xs text-[#8b4a5d]">You are assigned to {assignedLabel}</div>
+                                </div>
+                              </li>
+                            </>
+                          )
+                        })()
+                      ) : (
+                        <li className="px-4 py-3 text-[#8c7f86]">No notifications yet</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           </div>

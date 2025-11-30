@@ -88,9 +88,9 @@ export default function Settings() {
   if (!user || user.role !== 'DEPT_HEAD') return <Navigate to="/" replace />
 
   return (
-    <div className="flex">
+    <div className="min-h-screen flex">
       <Sidebar />
-      <main className="flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto h-[100dvh]">
+      <main className="flex-1 bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 overflow-y-auto">
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">SETTINGS</h1>

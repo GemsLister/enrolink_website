@@ -1,4 +1,4 @@
-import { readSheet, readSheetByUrl } from '../services/google/sheets.js';
+import { readSheet, readSheetByUrl, writeSheet } from '../services/google/sheets.js';
 import { getStudentModel } from '../models/Student.js';
 import { getInterviewModel } from '../models/Interview.js';
 
@@ -78,5 +78,46 @@ export async function importStudents(req, res, next) {
       docs.push(s);
     }
     res.json({ imported: docs.length });
+  } catch (e) { next(e); }
+}
+
+export async function exportStudentsToSheet(req, res, next) {
+  try {
+    const { spreadsheetId, range, year } = req.body;
+    if (!spreadsheetId || !range) return res.status(400).json({ error: 'Missing spreadsheetId or range' });
+    const Student = getStudentModel();
+    const q = {};
+    if (year) q.$or = [ { batch: new RegExp(`^${String(year)}`) }, { year: String(year) } ];
+    const docs = await Student.find(q).lean();
+    const header = ['id','firstName','lastName','email','status','batch','year','createdAt','updatedAt'];
+    const values = [header];
+    for (const d of docs) {
+      const batchStr = String(d.batch || '');
+      const yr = String(d.year || (batchStr.includes('-') ? batchStr.split('-')[0] : '') || '');
+      values.push([
+        String(d._id || ''),
+        String(d.firstName || ''),
+        String(d.lastName || ''),
+        String(d.email || ''),
+        String((d.status || 'PENDING')).toUpperCase(),
+        batchStr,
+        yr,
+        d.createdAt ? new Date(d.createdAt).toISOString() : '',
+        d.updatedAt ? new Date(d.updatedAt).toISOString() : ''
+      ]);
+    }
+    await writeSheet(spreadsheetId, range, values);
+    res.json({ ok: true, rows: values.length - 1 });
+  } catch (e) { next(e); }
+}
+
+export async function exportStudentsDefault(req, res, next) {
+  try {
+    const spreadsheetId = process.env.SHEETS_SPREADSHEET_ID || '';
+    const range = process.env.SHEETS_EXPORT_RANGE || 'Sheet1!A1:I';
+    const year = req.query.year ? String(req.query.year) : '';
+    if (!spreadsheetId) return res.status(400).json({ error: 'Missing SHEETS_SPREADSHEET_ID in environment' });
+    req.body = { spreadsheetId, range, year };
+    return exportStudentsToSheet(req, res, next);
   } catch (e) { next(e); }
 }

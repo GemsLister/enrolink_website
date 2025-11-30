@@ -52,7 +52,7 @@ export default function OfficerStudentRecords({ view = 'applicants' }) {
   
   return (
     <ErrorBoundary>
-      <div className="flex">
+      <div className="min-h-screen flex">
         <OfficerSidebar />
         <RecordsPanel token={token} view={view} basePath="/officer/records" />
       </div>

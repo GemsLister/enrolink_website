@@ -125,3 +125,16 @@ body {
 .rbc-today {
   background-color: #f8f9fa;
 }
+/* Global button interaction improvements */
+button {
+  cursor: pointer;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.03);
+  box-shadow: 0 6px 16px rgba(139, 23, 47, 0.12);
+}
+button:active:not(:disabled) {
+  filter: brightness(0.98);
+  transform: translateY(0.5px);
+}

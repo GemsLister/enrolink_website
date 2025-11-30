@@ -16,29 +16,5 @@ function buildClientId() {
   return `${rnd}.${ts}`
 }
 
-export async function sendGaEvent({ userId, eventName, params }) {
-  const { measurementId, apiSecret } = getGaConfig()
-  if (!measurementId || !apiSecret) return
-  const endpoint = new URL('https://www.google-analytics.com/mp/collect')
-  endpoint.searchParams.set('measurement_id', measurementId)
-  endpoint.searchParams.set('api_secret', apiSecret)
-  const payload = {
-    client_id: buildClientId(),
-    user_id: toBool(process.env.GA_USE_USER_ID) ? String(userId || '') || undefined : undefined,
-    events: [
-      { name: eventName, params: params || {} }
-    ]
-  }
-  try {
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    if (!resp.ok) {
-      const text = await resp.text()
-      throw new Error(`GA MP error ${resp.status}: ${text}`)
-    }
-  } catch (_) { }
-}
+export async function sendGaEvent() { return }
 

@@ -24,27 +24,9 @@ export default function OfficerSidebar() {
         </svg>
       ),
     },
-    {
-      name: 'Calendar',
-      path: '/officer/calendar',
-      icon: (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M6 2a1 1 0 012 0v1h4V2a1 1 0 112 0v1h1a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h1V2zM5 7v8h10V7H5z" />
-        </svg>
-      ),
-    },
-    {
-      name: 'Batch Management',
-      path: '/officer/batch-management',
-      icon: (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-        </svg>
-      )
-    },
     { name: 'Settings', path: '/officer/settings', icon: (
       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M11.983 1.535a1 1 0 00-1.966 0l-.134.804a6.993 6.993 0 00-1.657.962l-.747-.43a1 1 0 00-1.366.366L3.2 4.732a1 1 0 00.366 1.366l.747.43a6.993 6.993 0 000 1.924l-.747.43A1 1 0 003.2 10.248l.903 1.565a1 1 0 001.366.366l.747-.43c.51.4 1.065.73 1.657.962l.134.804a1 1 0 001.966 0l.134-.804a6.993 6.993 0 001.657-.962l.747.43a1 1 0 001.366-.366l.903-1.565a1 1 0 00-.366-1.366l-.747-.43a6.993 6.993 0 000-1.924l.747-.43a1 1 0 00.366-1.366l-.903-1.565a1 1 0 00-1.366-.366l-.747.43a6.993 6.993 0 00-1.657-.962l-.134-.804zM10 13a3 3 0 110-6 3 3 0 010 6z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M11.983 1.535a1 1 0 00-1.966 0l-.134.804a6.993 6.993 0 00-1.657.962l-.747-.43a1 1 0 00-1.366.366L3.2 4.732a1 1 0 00.366 1.366l.747.43a6.993 6.993 0 000 1.924l-.747.43A1 1 0 003.2 10.248l.903 1.565a1 1 0 001.366.366l.747-.43c.51 .4 1.065 .73 1.657 .962l.134 .804a1 1 0 001.966 0l.134 -.804a6.993 6.993 0 001.657 -.962l.747 .43a1 1 0 001.366 -.366l.903 -1.565a1 1 0 00-.366 -1.366l-.747 -.43a6.993 6.993 0 000 -1.924l.747 -.43a1 1 0 00.366 -1.366l-.903 -1.565a1 1 0 00-1.366 -.366l-.747 .43a6.993 6.993 0 00-1.657 -.962l-.134 -.804zM10 13a3 3 0 110 -6 3 3 0 010 6z" clipRule="evenodd" />
       </svg>
     )},
   ]
@@ -57,7 +39,7 @@ export default function OfficerSidebar() {
   }
 
   return (
-    <aside className="flex flex-col h-full w-80 bg-gradient-to-b from-red-300 to-pink-100">
+    <aside className="flex flex-col min-h-screen w-80 bg-gradient-to-b from-red-300 to-pink-100">
       <div className="p-8 flex justify-center overflow-visible">
         <Link to={'/officer'}>
           <img src={EnroLinkLogo} alt="EnroLink-logo" className="w-48 h-auto mt-[50px] mb-[30px] transform scale-125 origin-center z-10 transition-transform duration-200" />

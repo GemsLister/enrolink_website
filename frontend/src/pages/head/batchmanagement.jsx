@@ -40,16 +40,9 @@ export default function BatchManagement({ embedded = false }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
 
-    // Auto-open the selected batch when routed to /head/batch-management/:id
-    // and show members by default for quick adding
+    // When routed to /head/batch-management/:id, show page without opening edit modal
     useEffect(() => {
-      if (routeBatchId && batches && batches.length) {
-        const b = batches.find(x => x.id === routeBatchId)
-        if (b) {
-          handleRowClick(b)
-          setShowMembers(true)
-        }
-      }
+      // No-op: avoid auto-opening modal; navigation handles URL state
     }, [routeBatchId, batches])
 
     const content = (
@@ -96,6 +89,7 @@ export default function BatchManagement({ embedded = false }) {
                   selectedIds={selectedIds}
                   toggleRow={toggleRow}
                   handleRowClick={(b) => navigate(`/head/batches/${b.id}`)}
+                  openEditModal={(b) => handleRowClick(b)}
                   sortField={sortField}
                   sortDir={sortDir}
                   onHeaderSort={(field) => {

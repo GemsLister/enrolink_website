@@ -1,18 +1,18 @@
 import { google } from 'googleapis';
 
-function authClient() {
+function authClient(scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']) {
   const creds = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}');
   const jwt = new google.auth.JWT(
     creds.client_email,
     null,
     creds.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    scopes
   );
   return jwt;
 }
 
 export async function readSheet(spreadsheetId, range) {
-  const auth = await authClient();
+  const auth = await authClient(['https://www.googleapis.com/auth/spreadsheets.readonly']);
   const sheets = google.sheets({ version: 'v4', auth });
   const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range });
   return resp.data.values || [];
@@ -52,7 +52,7 @@ async function resolveSheetTitleByGid(sheetsApi, spreadsheetId, gidStr) {
 export async function readSheetByUrl(urlStr) {
   const { spreadsheetId, gid, range } = parseSheetUrl(urlStr);
   if (!spreadsheetId) throw new Error('Invalid Google Sheets URL');
-  const auth = await authClient();
+  const auth = await authClient(['https://www.googleapis.com/auth/spreadsheets.readonly']);
   const sheets = google.sheets({ version: 'v4', auth });
   let sheetTitle = '';
   try {
@@ -61,4 +61,15 @@ export async function readSheetByUrl(urlStr) {
   const effectiveRange = range || `${sheetTitle || 'Sheet1'}!A:Z`;
   const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range: effectiveRange });
   return resp.data.values || [];
+}
+
+export async function writeSheet(spreadsheetId, range, values) {
+  const auth = await authClient(['https://www.googleapis.com/auth/spreadsheets']);
+  const sheets = google.sheets({ version: 'v4', auth });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption: 'RAW',
+    requestBody: { values }
+  });
 }

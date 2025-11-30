@@ -1703,9 +1703,9 @@ export default function StudentRecords({ view = 'applicants' }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || user.role !== 'DEPT_HEAD') return <Navigate to="/" replace />
   return (
-    <div className="flex">
+    <div className="min-h-screen flex">
       <Sidebar />
       <RecordsPanel token={token} view={view} basePath="/head/records" />
-        </div>
+    </div>
   )
 }

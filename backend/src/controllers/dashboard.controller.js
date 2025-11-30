@@ -96,9 +96,13 @@ export async function activity(req, res, next) {
       .select('firstName lastName status updatedAt createdAt')
       .lean();
 
-    const actor = (req.user && (req.user.firstName || req.user.lastName))
-      ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim()
-      : 'System';
+    let actor = 'System';
+    if (req.user) {
+      const byName = (req.user.name || '').trim();
+      const byFirstLast = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim();
+      const byEmail = (req.user.email || '').trim();
+      actor = byName || byFirstLast || byEmail || 'System';
+    }
 
     const events = rows.map(s => {
       const created = new Date(s.createdAt).getTime();

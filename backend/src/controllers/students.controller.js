@@ -148,3 +148,38 @@ export async function remove(req, res, next) {
     next(e);
   }
 }
+
+export async function exportCsv(req, res, next) {
+  try {
+    const Student = getStudentModel();
+    const q = {};
+    const year = req.query.year ? String(req.query.year) : '';
+    if (year) q.$or = [{ batch: new RegExp(`^${year}`) }, { year }];
+    const docs = await Student.find(q).lean();
+    const rows = docs.map(d => ({
+      id: String(d._id || ''),
+      firstName: String(d.firstName || ''),
+      lastName: String(d.lastName || ''),
+      email: String(d.email || ''),
+      status: String(d.status || 'PENDING').toUpperCase(),
+      batch: String(d.batch || ''),
+      year: String(d.year || (String(d.batch || '').includes('-') ? String(d.batch || '').split('-')[0] : '') || ''),
+      createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : '',
+      updatedAt: d.updatedAt ? new Date(d.updatedAt).toISOString() : ''
+    }));
+    const esc = (v) => {
+      const s = String(v == null ? '' : v);
+      const needsQuote = /[",\n]/.test(s);
+      const quoted = '"' + s.replace(/"/g, '""') + '"';
+      return needsQuote ? quoted : s;
+    };
+    const header = ['id','firstName','lastName','email','status','batch','year','createdAt','updatedAt'].join(',');
+    const body = rows.map(r => [r.id,r.firstName,r.lastName,r.email,r.status,r.batch,r.year,r.createdAt,r.updatedAt].map(esc).join(',')).join('\n');
+    const csv = header + '\n' + body;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="students.csv"');
+    res.send(csv);
+  } catch (e) {
+    next(e);
+  }
+}

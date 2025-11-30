@@ -291,70 +291,8 @@ export default function Dashboard() {
             ))}
           </section>
 
-          {/* Analytics panels or Looker Studio embed */}
-          {import.meta.env.VITE_LOOKER_STUDIO_EMBED_URL ? (
-            <section className="mt-6 grid grid-cols-1">
-              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Analytics Report</h2>
-                <div className="mt-4">
-                  <iframe
-                    src={import.meta.env.VITE_LOOKER_STUDIO_EMBED_URL}
-                    style={{ width: '100%', height: 420, border: '0' }}
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-            </section>
-          ) : (
+          {
             <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Counts: Pass vs Fail</h2>
-                {(() => {
-                  const base = totals.interviewed || totals.totalApplicants || 0
-                  const rows = [
-                    { label: 'Failed', value: Math.max(0, base - Number(totals.passedInterview || 0)), color: '#7d102a' },
-                    { label: 'Passed', value: Number(totals.passedInterview || 0), color: '#f4c3ce' },
-                  ]
-                  if (!base) return (<div className="mt-5 text-sm text-[#a86a74]">No data for the selected school year.</div>)
-                  return (
-                    <div className="mt-4 flex flex-col gap-3">
-                      {rows.map((r) => {
-                        const pct = Math.max(0, Math.min(100, Math.round((r.value / base) * 100)))
-                        return (
-                          <div key={r.label} className="grid grid-cols-[1fr_80px] items-center gap-4">
-                            <div className="flex items-center gap-3">
-                              <span className="w-20 text-sm text-[#7d102a]">{r.label}</span>
-                              <div className="flex-1 h-4 rounded-full bg-[#f2f4f7]">
-                                <div className="h-4 rounded-full" style={{ width: `${pct}%`, background: r.color }} />
-                              </div>
-                            </div>
-                            <div className="text-right text-sm text-[#7d102a] font-semibold">{r.value}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })()}
-              </div>
-              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
-                <QuickChart
-                  type="PieChart"
-                  className="mt-4"
-                  style={{ width: '100%', height: 280 }}
-                  data={[["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)]]}
-                  options={{
-                    backgroundColor: 'transparent',
-                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                    slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
-                  }}
-                />
-              </div>
-            </section>
-          )}
-
-          {!import.meta.env.VITE_LOOKER_STUDIO_EMBED_URL && (
-            <section className="mt-6 grid grid-cols-1">
               <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
                 <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
                 {(() => {
@@ -364,19 +302,37 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 280 }}
+                      style={{ width: '100%', height: 'auto' }}
                       data={data}
                       options={{
                         backgroundColor: 'transparent',
                         legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
                         slices: { 0: { color: '#7d102a' } },
                       }}
+                      engine="quickchart"
                     />
                   )
                 })()}
               </div>
+              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                <QuickChart
+                  type="PieChart"
+                  className="mt-4"
+                  style={{ width: '100%', height: 'auto' }}
+                  data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
+                  options={{
+                    backgroundColor: 'transparent',
+                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                    slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
+                  }}
+                  engine="quickchart"
+                />
+              </div>
             </section>
-          )}
+          }
+
+          {null}
 
           {/* Google Calendar UI */}
           <section className="mt-6">

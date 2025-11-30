@@ -8,10 +8,10 @@ export default function BatchesTable({
   selectedIds,
   toggleRow,
   handleRowClick,
+  openEditModal,
   sortField,
   sortDir,
   onHeaderSort,
-  getStatusBadge,
   statusOptions = [],
   onChangeStatus,
 }) {
@@ -25,8 +25,8 @@ export default function BatchesTable({
     return `${mm}/${dd}/${yy}`
   }
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      <table className="w-full table-fixed">
+    <div className="bg-white rounded-[13px] border border-[#efccd2] overflow-hidden">
+      <table className="min-w-[720px] w-full table-fixed">
         <colgroup>
           <col style={{ width: '48px' }} />
           <col style={{ width: '28%' }} />
@@ -36,7 +36,7 @@ export default function BatchesTable({
           <col style={{ width: '14%' }} />
           <col style={{ width: '10%' }} />
         </colgroup>
-        <thead className="bg-red-300">
+        <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-4 text-left">
               <input type="checkbox" className="rounded border-gray-300" checked={displayedBatches.length > 0 && allDisplayedSelected} onChange={(e) => toggleAllDisplayed(e.target.checked)} />
@@ -64,10 +64,10 @@ export default function BatchesTable({
         <tbody>
           {batchesLoading && (<tr><td colSpan={6} className="px-6 py-6 text-center text-gray-600">Loading batches…</td></tr>)}
           {!batchesLoading && displayedBatches.length === 0 && (<tr><td colSpan={6} className="px-6 py-10 text-center text-gray-600">No batches found</td></tr>)}
-          {!batchesLoading && displayedBatches.map((batch, index) => (
+          {!batchesLoading && displayedBatches.map((batch) => (
             <tr
               key={batch.id}
-              className={`border-b border-gray-100 hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} cursor-pointer`}
+              className={`border-b border-gray-100 hover:bg-gray-50 transition-colors bg-white cursor-pointer`}
               onClick={() => handleRowClick(batch)}
             >
               <td className="px-6 py-4">
@@ -93,7 +93,7 @@ export default function BatchesTable({
               <td className='px-6 py-4'>
                 <button
                   type="button"
-                  onClick={() => handleRowClick(batch)}
+                  onClick={() => (openEditModal ? openEditModal(batch) : handleRowClick(batch))}
                   className="flex justify-center p-1 rounded-[10px] border border-gray-300 hover:bg-gray-100 text-gray-700"
                   aria-label="Edit batch"
                 >
