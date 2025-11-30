@@ -60,7 +60,10 @@ export default function BatchPage() {
           isOpen={showAddModal}
           selectedBatch={selectedBatch}
           onClose={() => setShowAddModal(false)}
-          onAdded={() => loadMembers(selectedBatch?.id)}
+          onAdded={() => {
+            try { if (window.gtag) window.gtag('event', 'batch_add_student', { batch_id: selectedBatch?.id }) } catch (_) {}
+            loadMembers(selectedBatch?.id)
+          }}
         />
 
         <div className="mt-6 bg-white rounded-2xl border border-rose-200 overflow-auto shadow-[0_12px_24px_rgba(139,23,47,0.08)]">

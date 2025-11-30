@@ -356,6 +356,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
         const result = await api.calendarPushToGoogle(token);
         console.log('Push to Google result:', result);
         updateEventsForView(currentView, currentDate, { silent: true });
+        sendGaEvent('calendar_push_to_google')
       } catch (e) {
         console.error('Failed to push events to Google:', e);
         setError(e.message || 'Failed to push events to Google Calendar');
@@ -476,3 +477,6 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     </div>
   );
 }
+  const sendGaEvent = (name, params = {}) => {
+    try { if (window.gtag) window.gtag('event', name, params) } catch (_) {}
+  }

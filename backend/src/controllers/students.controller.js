@@ -1,5 +1,6 @@
 import { getStudentModel } from '../models/Student.js';
 import { getInterviewModel } from '../models/Interview.js';
+import { sendGaEvent } from '../services/analytics.js';
 
 function buildNameSignature({ firstName, middleName, lastName }) {
   const normalize = (value) => (value || '').trim().toLowerCase();
@@ -59,6 +60,16 @@ export async function upsert(req, res, next) {
         return res.status(409).json({ error: 'Conflict: record has been modified by another user' });
       }
       const doc = await Student.findById(id).lean();
+      try {
+        await sendGaEvent({
+          userId: req.user && req.user.id,
+          eventName: 'student_update',
+          params: {
+            batch: String(doc && (doc.batch || doc.batchId || '')),
+            record_category: String(doc && (doc.recordCategory || ''))
+          }
+        })
+      } catch (_) {}
       return res.json({ doc });
     }
     if (nameSignature) {
@@ -71,6 +82,16 @@ export async function upsert(req, res, next) {
       }
     }
     const doc = await Student.create(data);
+    try {
+      await sendGaEvent({
+        userId: req.user && req.user.id,
+        eventName: 'student_create',
+        params: {
+          batch: String(doc && (doc.batch || doc.batchId || '')),
+          record_category: String(doc && (doc.recordCategory || ''))
+        }
+      })
+    } catch (_) {}
     res.json({ doc });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -110,6 +131,16 @@ export async function remove(req, res, next) {
         }
       }
     } catch (_) { /* ignore cascade errors */ }
+    try {
+      await sendGaEvent({
+        userId: req.user && req.user.id,
+        eventName: 'student_delete',
+        params: {
+          batch: String(student && (student.batch || student.batchId || '')),
+          record_category: String(student && (student.recordCategory || ''))
+        }
+      })
+    } catch (_) {}
     res.json({ ok: true });
   } catch (e) {
     // eslint-disable-next-line no-console

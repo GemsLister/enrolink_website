@@ -98,6 +98,7 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
       } else {
         await api.calendarCreate(eventData, token)
       }
+      try { if (window.gtag) window.gtag('event', isEditing ? 'schedule_update' : 'schedule_create', { all_day: !!allDay }) } catch (_) {}
       setSummary('')
       setDescription('')
       setLocation('')
