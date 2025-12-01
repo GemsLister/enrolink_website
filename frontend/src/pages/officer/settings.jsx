@@ -50,45 +50,52 @@ export default function OfficerSettings() {
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-white">
       <OfficerSidebar />
-      <main className="flex-1 bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 overflow-y-auto">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-5xl font-bold text-red-900 mb-2 mt-[35px]">SETTINGS</h1>
-            <p className="text-lg text-gray-1000 font-bold mt-[20px]">Manage your officer account</p>
+      <main className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-y-auto">
+        <div className="min-h-0 flex flex-col px-10 pt-10 pb-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+              <h1 className="text-4xl font-semibold text-[#5b1a30]">Settings</h1>
+              <p className="text-base text-[#8b4a5d]">Manage your officer account and preferences</p>
+            </div>
           </div>
-        </div>
 
-        {err && <div className="text-sm text-red-600 mb-2">{err}</div>}
-        {msg && <div className="text-sm text-green-700 mb-2">{msg}</div>}
+          {err && <div className="rounded-2xl px-5 py-3 text-sm font-medium bg-[#F7D9D9] text-red-700">{err}</div>}
+          {msg && <div className="rounded-2xl px-5 py-3 text-sm font-medium bg-emerald-100 text-emerald-700">{msg}</div>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Personal Information</h2>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Full Name</label>
-              <input value={profile.name} onChange={(e)=>setProfile(p=>({...p,name:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Email Address</label>
-              <input value={profile.email} readOnly className="bg-gray-50 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <button onClick={saveProfile} disabled={savingProfile} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{savingProfile?'Saving…':'Update Personal Information'}</button>
-          </section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Personal Information</h2>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Full Name</label>
+                <input value={profile.name} onChange={(e)=>setProfile(p=>({...p,name:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full focus:border-black-400 focus:outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Email Address</label>
+                <input value={profile.email} readOnly className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full opacity-60" />
+              </div>
+              <div className="flex justify-end">
+                <button onClick={saveProfile} disabled={savingProfile} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{savingProfile?'Saving…':'Update Personal Information'}</button>
+              </div>
+            </section>
 
-          <section className="bg-white rounded-xl border border-pink-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Security Settings</h2>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Current Password</label>
-              <input type="password" value={pw.currentPassword} onChange={(e)=>setPw(p=>({...p,currentPassword:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">New Password</label>
-              <input type="password" value={pw.newPassword} onChange={(e)=>setPw(p=>({...p,newPassword:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <button onClick={changePassword} disabled={changingPw || !pw.currentPassword || !pw.newPassword} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{changingPw?'Updating…':'Update Password'}</button>
-          </section>
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Security Settings</h2>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Current Password</label>
+                <input type="password" value={pw.currentPassword} onChange={(e)=>setPw(p=>({...p,currentPassword:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">New Password</label>
+                <input type="password" value={pw.newPassword} onChange={(e)=>setPw(p=>({...p,newPassword:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="flex justify-end">
+                <button onClick={changePassword} disabled={changingPw || !pw.currentPassword || !pw.newPassword} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{changingPw?'Updating…':'Update Password'}</button>
+              </div>
+            </section>
+          </div>
         </div>
       </main>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
+import UserChip from '../../components/UserChip'
 import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
 import { getStatusBadge, toUiStatus } from '../../utils/status'
@@ -142,6 +143,9 @@ export default function Reports() {
         <Sidebar />
       </aside>
       <main className="flex-1 bg-[#fff6f7] px-10 pt-12 pb-10 overflow-y-auto">
+        <div className="flex items-center justify-end mb-4">
+          <UserChip />
+        </div>
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <p className="uppercase tracking-[0.4em] text-sm text-rose-400">Records</p>

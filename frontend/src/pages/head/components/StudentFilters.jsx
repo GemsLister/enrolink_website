@@ -1,4 +1,5 @@
 import React from 'react'
+import UserChip from '../../../components/UserChip'
 
 export default function StudentFilters({
   title,
@@ -31,14 +32,8 @@ export default function StudentFilters({
           <p className="text-lg text-gray-1000 font-bold mt-[20px]">List of 1st Year Applicants</p>
         </div>
 
-        <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-15 flex items-center gap-3 mt-[-50px]">
-          <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-          </svg>
-          <span className="text-gray-800 font-medium">Santiago Garcia</span>
-          <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
+        <div className="mt-[-50px]">
+          <UserChip />
         </div>
       </div>
 

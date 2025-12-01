@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
+import Union from "../../assets/Union.png";
+import UserChip from "../../components/UserChip";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/client";
 
@@ -248,13 +250,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
               <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Enrollment Officers</h1>
               <p className="text-base text-[#5b1a30]">List of current enrollment officers</p>
             </div>
-            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
-              <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
-              </button>
-              <span className="h-5 w-px bg-[#e4b7bf]" />
-              <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
-            </div>
+            <UserChip />
           </div>
 
         <div className="flex items-center gap-4 mb-4">
@@ -268,37 +264,6 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
             />
           </div>
           <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Pending invites</button>
-          <div className="relative">
-            <button type="button" onClick={() => setShowNotif(v => !v)} className="flex items-center justify-center w-9 h-9 rounded-full bg-white text-[#2f2b33] border border-[#efccd2] hover:bg-[#fff5f7]">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
-            </button>
-            {showNotif && (
-              <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#efccd2] bg-white shadow-2xl text-sm text-[#5b1a30] z-[1000]">
-                <div className="px-4 py-2 border-b border-[#f3d9de] font-semibold text-xs text-[#7d102a]">Notifications</div>
-                <ul className="max-h-64 overflow-auto py-1">
-                  {(() => {
-                    const now = Date.now();
-                    const recent = (officers || []).filter(o => {
-                      const t = new Date(o.createdAt || 0).getTime();
-                      if (!t) return false;
-                      const diffDays = (now - t) / (1000 * 60 * 60 * 24);
-                      return diffDays <= 7;
-                    });
-                    if (!recent.length) return (<li className="px-4 py-3 text-[#8c7f86]">No recent acceptances</li>);
-                    return recent.map(o => (
-                      <li key={o._id} className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
-                        <div className="w-7 h-7 rounded-full bg-[#f2c6cf] text-[#8a1d35] flex items-center justify-center text-[10px] font-semibold">OK</div>
-                        <div className="flex-1">
-                          <div className="font-semibold">{o.name || o.email || '-'}</div>
-                          <div className="text-xs text-[#8b4a5d]">Accepted invite {timeAgo(o.createdAt)}</div>
-                        </div>
-                      </li>
-                    ));
-                  })()}
-                </ul>
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="flex items-center justify-between mb-2 px-1">
@@ -432,9 +397,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <div className="flex justify-center mt-4">
-                  <div className="w-24 h-24 bg-gradient-to-b from-white/70 to-pink-200 rounded-full flex items-center justify-center shadow-[inset_0_6px_12px_rgba(0,0,0,0.06)] relative">
-                    <div className="absolute w-20 h-20 rounded-full bg-gradient-to-b from-white to-pink-100 flex items-center justify-center shadow-md border border-white/50"></div>
-                  </div>
+                  <img src={Union} alt="Union" className="w-24 h-24" />
                 </div>
               </div>
               {error && <div className="text-sm text-red-700 mb-2">{error}</div>}

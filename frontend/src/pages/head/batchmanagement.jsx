@@ -8,6 +8,7 @@ import BatchesTable from './components/BatchesTable'
 import AddBatchModal from './components/AddBatchModal'
 import ImportModal from './components/ImportModal'
 import BatchDetailsModal from './components/BatchDetailsModal'
+import UserChip from '../../components/UserChip'
 
 export default function BatchManagement({ embedded = false }) {
     const { isAuthenticated, user, token } = useAuth()
@@ -52,13 +53,7 @@ export default function BatchManagement({ embedded = false }) {
                 <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Batch Management</h1>
                 <p className="text-base text-[#5b1a30]">List of Batches</p>
               </div>
-              <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
-                <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
-                </button>
-                <span className="h-5 w-px bg-[#e4b7bf]" />
-                <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
-              </div>
+              <UserChip />
             </div>
             <BatchFilters
                   query={query}

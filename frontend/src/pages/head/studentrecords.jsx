@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
+import UserChip from '../../components/UserChip'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
@@ -413,6 +414,7 @@ export function RecordsOverviewContent({ basePath }) {
 
 export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const api = useApi(token)
+  const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
@@ -474,6 +476,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [exportOrientation, setExportOrientation] = useState('landscape')
   const [exportPaperSize, setExportPaperSize] = useState('A4')
   const [selectedRows, setSelectedRows] = useState([])
+  const [confirmArchiveIds, setConfirmArchiveIds] = useState([])
   
 
   const isArchiveView = view === 'archive'
@@ -843,6 +846,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }
   const clearSelection = () => setSelectedRows([])
 
+  const isAwaitingArchiveConfirm = (row) => {
+    const id = getRowId(row)
+    if (!id) return false
+    return confirmArchiveIds.includes(id)
+  }
+
+  const toggleArchiveConfirm = (row) => {
+    const id = getRowId(row)
+    if (!id) return
+    if (confirmArchiveIds.includes(id)) {
+      setConfirmArchiveIds((prev) => prev.filter((x) => x !== id))
+    } else {
+      setConfirmArchiveIds((prev) => [...prev, id])
+    }
+  }
+
+  useEffect(() => {
+    const onDocClick = () => setConfirmArchiveIds([])
+    document.addEventListener('click', onDocClick)
+    return () => {
+      document.removeEventListener('click', onDocClick)
+    }
+  }, [])
+
   const cancelEditing = useCallback(() => {
     if (!editingId) return
     if (editingMeta?.isNew && editingMeta?.clientId) {
@@ -1096,9 +1123,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       payload.archived_at = new Date().toISOString()
       await api.post('/students', payload)
       setBanner({ type: 'success', message: 'Archived successfully.' })
-      const key = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
-      navigate(`${basePath}/archive?type=${encodeURIComponent(key)}`)
       await fetchRows()
+      const id = getRowId(row)
+      if (id) setConfirmArchiveIds((prev) => prev.filter((x) => x !== id))
     } catch (e) {
       setBanner({ type: 'error', message: e.message || 'Failed to archive.' })
     }
@@ -1119,16 +1146,22 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     }
   }
 
-  const handleDelete = async (row) => {
+  const handleInlineStatusChange = async (row, next) => {
     try {
-      if (!row._id) return
-      await api.delete(`/students/${row._id}`)
-      setBanner({ type: 'success', message: 'Deleted permanently.' })
+      const payload = {}
+      ALL_COLUMN_KEYS.forEach((k) => { payload[k] = row[k] ?? '' })
+      if (row._id) payload.id = row._id
+      if (row.__v !== undefined) payload.__v = row.__v
+      payload.recordCategory = next
+      await api.post('/students', payload)
+      setBanner({ type: 'success', message: 'Status updated.' })
       await fetchRows()
     } catch (e) {
-      setBanner({ type: 'error', message: e.message || 'Failed to delete.' })
+      setBanner({ type: 'error', message: e.message || 'Failed to update status.' })
     }
   }
+
+  
 
   useEffect(() => {
     if (isArchiveView) {
@@ -1147,13 +1180,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
-              <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
-                <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
-                </button>
-                <span className="h-5 w-px bg-[#e4b7bf]" />
-                <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
-              </div>
+              <UserChip />
             </div>
             <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
             <p className="text-base text-[#8b4a5d] max-w-3xl">{headerSubtitle}</p>
@@ -1499,13 +1526,32 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     </button>
                                   ) : (
                                     view !== 'archive' ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleArchive(row)}
-                                        className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200"
-                                      >
-                                        Archive
-                                      </button>
+                                      isAwaitingArchiveConfirm(row) ? (
+                                        <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleArchive(row)}
+                                            className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-semibold text-white hover:bg-yellow-700"
+                                          >
+                                            Confirm
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleArchiveConfirm(row)}
+                                            className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#6b0000] hover:bg-rose-50"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); toggleArchiveConfirm(row) }}
+                                          className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200"
+                                        >
+                                          Archive
+                                        </button>
+                                      )
                                     ) : (
                                       <>
                                         <button
@@ -1515,21 +1561,20 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                         >
                                           Restore
                                         </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDelete(row)}
-                                          className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#c4375b] hover:border-rose-400"
-                                        >
-                                          Delete Permanently
-                                        </button>
                                       </>
                                     )
                                   )}
                                 </div>
-                              ) : column.key === 'recordCategory' && value ? (
-                                <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-                                  {value}
-                                </span>
+                              ) : column.key === 'recordCategory' ? (
+                                <select
+                                  value={value || currentCategory}
+                                  onChange={(event) => handleInlineStatusChange(row, event.target.value)}
+                                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                >
+                                  {CATEGORY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
                               ) : (
                                 <span>
                                   {(() => {
@@ -1591,18 +1636,20 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                 Clear sort
               </button>
               <div className="border-t border-rose-50" />
-              {(getSortOptions(sortMenuKey) || []).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
-                    (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
-                  }`}
-                  onClick={() => handleSortChange(sortMenuKey, option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
+              <div className={sortMenuKey === 'number' ? 'max-h-64 overflow-y-auto' : ''}>
+                {(getSortOptions(sortMenuKey) || []).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
+                      (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
+                    }`}
+                    onClick={() => handleSortChange(sortMenuKey, option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
