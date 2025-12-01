@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
+import { api as clientApi } from '../../api/client'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
@@ -834,7 +835,23 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     }
     try {
       setSaving(true)
-              await api.post('/students', payload)
+      await api.post('/students', payload)
+      const name = [normalizeText(payload.lastName, 'name'), normalizeText(payload.firstName, 'name')]
+        .filter(Boolean)
+        .join(', ')
+      const longDate = normalizeDate(payload.interviewDate, 'long')
+      if (name && longDate) {
+        const parts = longDate.split('/')
+        if (parts.length === 3) {
+          const [mm, dd, yyyy] = parts
+          const startDate = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+          const d = new Date(`${startDate}T00:00:00`)
+          d.setDate(d.getDate() + 1)
+          const endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          const eventBody = { summary: name, start: { date: startDate }, end: { date: endDate } }
+          try { await clientApi.calendarCreate(eventBody, token) } catch (e) { void e }
+        }
+      }
       setBanner({ type: 'success', message: 'Record saved successfully.' })
       await fetchRows()
       restoreScroll()
@@ -846,7 +863,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       setEditingMeta(null)
       setEditingValues(EMPTY_RECORD)
     }
-  }, [api, editingId, editingMeta, editingValues, fetchRows, saving, setBanner])
+  }, [api, editingId, editingMeta, editingValues, fetchRows, saving, setBanner, restoreScroll, token])
 
   useEffect(() => {
     if (!editingId) return
@@ -869,7 +886,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       if (!editingRowRef.current) return
       const firstInput = editingRowRef.current.querySelector('input, select, textarea')
       if (firstInput && typeof firstInput.focus === 'function') {
-        try { firstInput.focus({ preventScroll: true }) } catch (_) { firstInput.focus() }
+        try { firstInput.focus({ preventScroll: true }) } catch { firstInput.focus() }
       }
       restoreScroll()
     }
@@ -921,10 +938,24 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
         try {
           // eslint-disable-next-line no-await-in-loop
           await api.post('/students', record)
+          const name = [normalizeText(record.lastName, 'name'), normalizeText(record.firstName, 'name')]
+            .filter(Boolean)
+            .join(', ')
+          const longDate = normalizeDate(record.interviewDate, 'long')
+          if (name && longDate) {
+            const parts = longDate.split('/')
+            if (parts.length === 3) {
+              const [mm, dd, yyyy] = parts
+              const startDate = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+              const d = new Date(`${startDate}T00:00:00`)
+              d.setDate(d.getDate() + 1)
+              const endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+              const eventBody = { summary: name, start: { date: startDate }, end: { date: endDate } }
+              try { await clientApi.calendarCreate(eventBody, token) } catch (e) { void e }
+            }
+          }
           successCount += 1
-        } catch (err) {
-          // swallow duplicate errors, show after loop
-        }
+        } catch (e) { void e }
       }
 
       setBanner({ type: 'success', message: `Imported ${successCount} record(s).` })

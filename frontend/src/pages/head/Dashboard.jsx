@@ -73,6 +73,10 @@ export default function Dashboard() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [gaPushing, setGaPushing] = useState(false);
+  const [emcTop, setEmcTop] = useState([]);
+  const [itTop, setItTop] = useState([]);
+  const [emcConfirmedData, setEmcConfirmedData] = useState([]);
+  const [itConfirmedData, setItConfirmedData] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -112,7 +116,7 @@ export default function Dashboard() {
         const data = await api.dashboardActivity(token, startYear);
         if (!alive) return;
         setActivities(Array.isArray(data?.events) ? data.events : []);
-      } catch (_) {
+      } catch {
         if (!alive) return;
         setActivities([]);
       }
@@ -142,7 +146,7 @@ export default function Dashboard() {
             new Date(b.start?.dateTime || b.start?.date || 0)
         );
         setGcal(items.slice(0, 10));
-      } catch (_) {
+      } catch {
         if (!alive) return;
         setGcal([]);
       }
@@ -151,6 +155,91 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
+  }, [token]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadLeaderboards() {
+      if (!token) return;
+      try {
+        const studentsRes = await api.request('GET', '/students', { token });
+        const reportsRes = await api.request('GET', '/reports', { token });
+        const students = Array.isArray(studentsRes?.rows) ? studentsRes.rows : [];
+        const reports = Array.isArray(reportsRes?.rows) ? reportsRes.rows : [];
+        const examMap = new Map();
+        for (const r of reports) {
+          const key = String(r.studentName || '').trim().toLowerCase();
+          if (!key) continue;
+          const val = typeof r.examScore === 'number' ? r.examScore : (r.examScore ?? undefined);
+          examMap.set(key, val);
+        }
+        const emcRows = [];
+        const itRows = [];
+        for (const s of students) {
+          const name1 = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase();
+          const name2 = `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase();
+          const key = name1 || name2;
+          if (!key) continue;
+          const course = String(s.course || s.preferredCourse || '').toUpperCase();
+          const examScore = examMap.get(key);
+          const entry = {
+            firstName: s.firstName || '',
+            lastName: s.lastName || '',
+            email: s.email || '',
+            percentileScore: s.percentileScore || '',
+            qScore: s.qScore || '',
+            sScore: s.sScore || '',
+            finalScore: s.finalScore || '',
+            examScore,
+            interviewDate: s.interviewDate || '',
+          };
+          if (course.includes('EMC')) emcRows.push(entry);
+          else if (course.includes('IT')) itRows.push(entry);
+        }
+        const rankVal = (row) => {
+          const f = Number(row.finalScore);
+          if (Number.isFinite(f)) return f;
+          const e = Number(row.examScore);
+          return Number.isFinite(e) ? e : -Infinity;
+        };
+        emcRows.sort((a,b) => rankVal(b) - rankVal(a));
+        itRows.sort((a,b) => rankVal(b) - rankVal(a));
+        if (!alive) return;
+        setEmcTop(emcRows.slice(0, 60));
+        setItTop(itRows.slice(0, 120));
+
+        const buildConfirmedChart = (rows) => {
+          const confirmed = rows.filter(r => !!r.interviewDate);
+          const counts = new Map();
+          for (const r of confirmed) {
+            const label = String(r.percentileScore || '').trim();
+            if (!label) continue;
+            counts.set(label, (counts.get(label) || 0) + 1);
+          }
+          const labels = Array.from(counts.keys());
+          labels.sort((a,b) => {
+            const pa = parseFloat(String(a).replace('%',''));
+            const pb = parseFloat(String(b).replace('%',''));
+            if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb;
+            return String(a).localeCompare(String(b));
+          });
+          const rowsData = labels.map(l => [l, counts.get(l)]);
+          const total = confirmed.length;
+          rowsData.push(['Grand Total', total]);
+          return [['Percentile Score','No of Confirmed Interviewees'], ...rowsData];
+        };
+        setEmcConfirmedData(buildConfirmedChart(emcRows));
+        setItConfirmedData(buildConfirmedChart(itRows));
+      } catch {
+        if (!alive) return;
+        setEmcTop([]);
+        setItTop([]);
+        setEmcConfirmedData([]);
+        setItConfirmedData([]);
+      }
+    }
+    loadLeaderboards();
+    return () => { alive = false; };
   }, [token]);
 
   async function refreshCalendar() {
@@ -169,7 +258,7 @@ export default function Dashboard() {
           new Date(b.start?.dateTime || b.start?.date || 0)
       );
       setGcal(items.slice(0, 10));
-    } catch (_) {
+    } catch {
       setGcal([]);
     }
     setCalendarRefreshKey((prev) => prev + 1);
@@ -191,7 +280,7 @@ export default function Dashboard() {
       setGaPushing(true);
       setError('');
       await api.dashboardPushGa(token, startYear);
-      try { if (window.gtag) window.gtag('event', 'dashboard_push_ga', { start_year: startYear }) } catch (_) {}
+      try { if (window.gtag) window.gtag('event', 'dashboard_push_ga', { start_year: startYear }) } catch { void 0 }
     } catch (e) {
       setError(e.message || 'Failed to push analytics');
     } finally {
@@ -199,8 +288,7 @@ export default function Dashboard() {
     }
   }
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!user || user.role !== "DEPT_HEAD") return <Navigate to="/" replace />;
+  const redirectTo = (!isAuthenticated ? "/login" : (!user || user.role !== "DEPT_HEAD" ? "/" : null));
 
   const totals = stats.totals || {
     totalApplicants: 0,
@@ -218,11 +306,6 @@ export default function Dashboard() {
   ];
 
   const batches = stats.batchAnalytics || [];
-  const avgBatchCount = useMemo(() => {
-    const arr = batches.map(b => Number(b.count ?? b.value ?? 0));
-    if (!arr.length) return 0;
-    return Math.round(arr.reduce((a, c) => a + c, 0) / arr.length);
-  }, [batches]);
 
   const passRate = useMemo(() => {
     const base = totals.interviewed || totals.totalApplicants || 0;
@@ -235,7 +318,9 @@ export default function Dashboard() {
     return { passed, failed };
   }, [totals]);
 
-  return (
+  return redirectTo ? (
+    <Navigate to={redirectTo} replace />
+  ) : (
     <div className="min-h-screen flex bg-white">
       {/* Left Sidebar (already styled to match) */}
       <aside className="w-80 shrink-0">
@@ -291,6 +376,47 @@ export default function Dashboard() {
             ))}
           </section>
 
+          <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+              <h2 className="text-sm font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
+              {emcConfirmedData && emcConfirmedData.length ? (
+                <QuickChart
+                  type="BarChart"
+                  className="mt-4"
+                  style={{ width: '100%', height: 'auto' }}
+                  data={emcConfirmedData}
+                  options={{
+                    backgroundColor: 'transparent',
+                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                    slices: { 0: { color: '#7d102a' } },
+                  }}
+                  engine="quickchart"
+                />
+              ) : (
+                <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+              )}
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+              <h2 className="text-sm font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+              {itConfirmedData && itConfirmedData.length ? (
+                <QuickChart
+                  type="BarChart"
+                  className="mt-4"
+                  style={{ width: '100%', height: 'auto' }}
+                  data={itConfirmedData}
+                  options={{
+                    backgroundColor: 'transparent',
+                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                    slices: { 0: { color: '#7d102a' } },
+                  }}
+                  engine="quickchart"
+                />
+              ) : (
+                <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+              )}
+            </div>
+          </section>
+
           {
             <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
               <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
@@ -332,7 +458,84 @@ export default function Dashboard() {
             </section>
           }
 
-          {null}
+          <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+              <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
+              <div className="mt-4">
+                {emcTop.length === 0 ? (
+                  <div className="text-sm text-[#a86a74]">No data.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-[#7d102a]">
+                      <thead>
+                        <tr className="text-xs text-[#a86a74]">
+                          <th className="text-left px-2 py-2">#</th>
+                          <th className="text-left px-2 py-2">Last Name</th>
+                          <th className="text-left px-2 py-2">First Name</th>
+                          <th className="text-left px-2 py-2">Email Address</th>
+                          <th className="text-left px-2 py-2">Final Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emcTop.map((row, idx) => (
+                          <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                            <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                            <td className="px-2 py-2">{row.lastName || '—'}</td>
+                            <td className="px-2 py-2">{row.firstName || '—'}</td>
+                            <td className="px-2 py-2">{row.email || '—'}</td>
+                            <td className="px-2 py-2">
+                              <div className="font-semibold">{row.finalScore || '—'}</div>
+                              <div className="text-xs text-[#a86a74]">
+                                Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+              <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+              <div className="mt-4">
+                {itTop.length === 0 ? (
+                  <div className="text-sm text-[#a86a74]">No data.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-[#7d102a]">
+                      <thead>
+                        <tr className="text-xs text-[#a86a74]">
+                          <th className="text-left px-2 py-2">#</th>
+                          <th className="text-left px-2 py-2">Last Name</th>
+                          <th className="text-left px-2 py-2">First Name</th>
+                          <th className="text-left px-2 py-2">Email Address</th>
+                          <th className="text-left px-2 py-2">Final Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itTop.map((row, idx) => (
+                          <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                            <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                            <td className="px-2 py-2">{row.lastName || '—'}</td>
+                            <td className="px-2 py-2">{row.firstName || '—'}</td>
+                            <td className="px-2 py-2">{row.email || '—'}</td>
+                            <td className="px-2 py-2">
+                              <div className="font-semibold">{row.finalScore || '—'}</div>
+                              <div className="text-xs text-[#a86a74]">
+                                Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
 
           {/* Google Calendar UI */}
           <section className="mt-6">
