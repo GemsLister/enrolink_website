@@ -77,6 +77,18 @@ export default function Dashboard() {
   const [itTop, setItTop] = useState([]);
   const [emcConfirmedData, setEmcConfirmedData] = useState([]);
   const [itConfirmedData, setItConfirmedData] = useState([]);
+  const [emcConfirmedCounts, setEmcConfirmedCounts] = useState([]);
+  const [itConfirmedCounts, setItConfirmedCounts] = useState([]);
+  const [includeAllInterviewees, setIncludeAllInterviewees] = useState(true);
+  const [courseFilter, setCourseFilter] = useState('IT');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [emcRowsAll, setEmcRowsAll] = useState([]);
+  const [itRowsAll, setItRowsAll] = useState([]);
+  const [emcPassersStrandData, setEmcPassersStrandData] = useState([]);
+  const [itPassersStrandData, setItPassersStrandData] = useState([]);
+  const [emcPassersStrandCounts, setEmcPassersStrandCounts] = useState([]);
+  const [itPassersStrandCounts, setItPassersStrandCounts] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -192,6 +204,8 @@ export default function Dashboard() {
             finalScore: s.finalScore || '',
             examScore,
             interviewDate: s.interviewDate || '',
+            shsStrand: s.shsStrand || '',
+            interviewerDecision: s.interviewerDecision || '',
           };
           if (course.includes('EMC')) emcRows.push(entry);
           else if (course.includes('IT')) itRows.push(entry);
@@ -202,34 +216,91 @@ export default function Dashboard() {
           const e = Number(row.examScore);
           return Number.isFinite(e) ? e : -Infinity;
         };
-        emcRows.sort((a,b) => rankVal(b) - rankVal(a));
-        itRows.sort((a,b) => rankVal(b) - rankVal(a));
+        emcRows.sort((a, b) => rankVal(b) - rankVal(a));
+        itRows.sort((a, b) => rankVal(b) - rankVal(a));
         if (!alive) return;
         setEmcTop(emcRows.slice(0, 60));
         setItTop(itRows.slice(0, 120));
 
         const buildConfirmedChart = (rows) => {
-          const confirmed = rows.filter(r => !!r.interviewDate);
+          const confirmed = includeAllInterviewees ? rows : rows.filter(r => !!r.interviewDate);
           const counts = new Map();
+          const formatPct = (val) => {
+            if (val === undefined || val === null) return '';
+            if (typeof val === 'number' && Number.isFinite(val)) return `${val.toFixed(2)}%`;
+            const txt = String(val).trim();
+            const m = txt.match(/^(\d+(?:\.\d+)?)\s*%?$/);
+            if (m) return `${parseFloat(m[1]).toFixed(2)}%`;
+            return txt; // fallback: keep as-is
+          };
           for (const r of confirmed) {
-            const label = String(r.percentileScore || '').trim();
+            const pct = r.percentileScore ?? '';
+            const fscore = r.finalScore ?? '';
+            const fallback = Number(r.examScore);
+            const label = formatPct(pct || fscore || (Number.isFinite(fallback) ? fallback : ''));
             if (!label) continue;
             counts.set(label, (counts.get(label) || 0) + 1);
           }
           const labels = Array.from(counts.keys());
-          labels.sort((a,b) => {
-            const pa = parseFloat(String(a).replace('%',''));
-            const pb = parseFloat(String(b).replace('%',''));
+          labels.sort((a, b) => {
+            const pa = parseFloat(String(a).replace('%', ''));
+            const pb = parseFloat(String(b).replace('%', ''));
             if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb;
             return String(a).localeCompare(String(b));
           });
           const rowsData = labels.map(l => [l, counts.get(l)]);
+          const countsList = labels.map(l => ({ label: l, count: counts.get(l) }));
           const total = confirmed.length;
           rowsData.push(['Grand Total', total]);
-          return [['Percentile Score','No of Confirmed Interviewees'], ...rowsData];
+          countsList.push({ label: 'Grand Total', count: total });
+          return { data: [['Percentile Score', 'No of Confirmed Interviewees'], ...rowsData], counts: countsList };
         };
-        setEmcConfirmedData(buildConfirmedChart(emcRows));
-        setItConfirmedData(buildConfirmedChart(itRows));
+        const emcChart = buildConfirmedChart(emcRows);
+        const itChart = buildConfirmedChart(itRows);
+        setEmcConfirmedData(emcChart.data);
+        setItConfirmedData(itChart.data);
+        setEmcConfirmedCounts(emcChart.counts);
+        setItConfirmedCounts(itChart.counts);
+        setEmcRowsAll(emcRows);
+        setItRowsAll(itRows);
+
+        const buildPassersByStrand = (rows) => {
+          const norm = (t) => {
+            const v = String(t || '').trim().toUpperCase();
+            if (!v) return '';
+            if (v.includes('STEM')) return 'STEM';
+            if (v.includes('ABM')) return 'ABM';
+            if (v.includes('HUMSS')) return 'HUMSS';
+            if (v.includes('TVL')) return 'TVL-ICT';
+            return v;
+          };
+          const passed = rows.filter(r => String(r.interviewerDecision || '').trim().toUpperCase() === 'PASSED');
+          const counts = new Map();
+          for (const r of passed) {
+            const key = norm(r.shsStrand);
+            if (!key) continue;
+            counts.set(key, (counts.get(key) || 0) + 1);
+          }
+          const labels = Array.from(counts.keys());
+          labels.sort((a, b) => {
+            const order = { 'STEM': 0, 'ABM': 1, 'HUMSS': 2, 'TVL-ICT': 3 };
+            const ai = order[a] ?? 99;
+            const bi = order[b] ?? 99;
+            return ai - bi;
+          });
+          const rowsData = labels.map(l => [l, counts.get(l)]);
+          const list = labels.map(l => ({ label: l, count: counts.get(l) }));
+          const total = passed.length;
+          rowsData.push(['Grand Total', total]);
+          list.push({ label: 'Grand Total', count: total });
+          return { data: [['SHS Strand', 'No. of Students who passed interview'], ...rowsData], counts: list };
+        };
+        const emcStrand = buildPassersByStrand(emcRows);
+        const itStrand = buildPassersByStrand(itRows);
+        setEmcPassersStrandData(emcStrand.data);
+        setItPassersStrandData(itStrand.data);
+        setEmcPassersStrandCounts(emcStrand.counts);
+        setItPassersStrandCounts(itStrand.counts);
       } catch {
         if (!alive) return;
         setEmcTop([]);
@@ -241,6 +312,46 @@ export default function Dashboard() {
     loadLeaderboards();
     return () => { alive = false; };
   }, [token]);
+
+  useEffect(() => {
+    const build = (rows) => {
+      const list = includeAllInterviewees ? rows : rows.filter(r => !!r.interviewDate);
+      const counts = new Map();
+      const fmt = (val) => {
+        if (val === undefined || val === null) return '';
+        if (typeof val === 'number' && Number.isFinite(val)) return `${val.toFixed(2)}%`;
+        const txt = String(val).trim();
+        const m = txt.match(/^(\d+(?:\.\d+)?)\s*%?$/);
+        return m ? `${parseFloat(m[1]).toFixed(2)}%` : txt;
+      };
+      for (const r of list) {
+        const pct = r.percentileScore ?? '';
+        const fscore = r.finalScore ?? '';
+        const fallback = Number(r.examScore);
+        const label = fmt(pct || fscore || (Number.isFinite(fallback) ? fallback : ''));
+        if (!label) continue;
+        counts.set(label, (counts.get(label) || 0) + 1);
+      }
+      const labels = Array.from(counts.keys()).sort((a, b) => {
+        const pa = parseFloat(String(a).replace('%', ''));
+        const pb = parseFloat(String(b).replace('%', ''));
+        if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb;
+        return String(a).localeCompare(String(b));
+      });
+      const rowsData = labels.map(l => [l, counts.get(l)]);
+      const countsList = labels.map(l => ({ label: l, count: counts.get(l) }));
+      const total = list.length;
+      rowsData.push(['Grand Total', total]);
+      countsList.push({ label: 'Grand Total', count: total });
+      return { data: [['Percentile Score', 'No of Confirmed Interviewees'], ...rowsData], counts: countsList };
+    };
+    const emcChart = build(emcRowsAll);
+    const itChart = build(itRowsAll);
+    setEmcConfirmedData(emcChart.data);
+    setItConfirmedData(itChart.data);
+    setEmcConfirmedCounts(emcChart.counts);
+    setItConfirmedCounts(itChart.counts);
+  }, [includeAllInterviewees, emcRowsAll, itRowsAll]);
 
   async function refreshCalendar() {
     if (!token) return;
@@ -317,6 +428,7 @@ export default function Dashboard() {
     const failed = Math.max(0, 100 - passed);
     return { passed, failed };
   }, [totals]);
+  const failedInterviewCount = Math.max(0, (totals.interviewed || 0) - (totals.passedInterview || 0));
 
   return redirectTo ? (
     <Navigate to={redirectTo} replace />
@@ -331,9 +443,11 @@ export default function Dashboard() {
       <div className="flex-1 grid grid-cols-[1fr_360px]">
         {/* Main content */}
         <main className="bg-[#f7f1f2] px-10 py-8">
-          <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">
-            DASHBOARD
-          </h1>
+          <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
+            <button onClick={() => setActiveTab('leaderboards')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
+          </div>
           <p className="mt-3 flex items-center gap-2 text-sm text-[#6e2a39]">
             <span>Showing for:</span>
             <select
@@ -347,9 +461,18 @@ export default function Dashboard() {
                 </option>
               ))}
             </select>
-            <button onClick={pushAnalyticsToGA} disabled={gaPushing} className="ml-4 h-7 rounded-full border border-[#efccd2] px-3 text-[12px] text-[#7d102a] hover:bg-[#f8e7eb]">
-              {gaPushing ? 'Pushing…' : 'Push to GA'}
-            </button>
+            
+            <label className="ml-4 inline-flex items-center gap-2">
+              <span>Show:</span>
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="font-semibold bg-transparent text-[#6e2a39] border border-[#efccd2] rounded-md px-2 py-1"
+              >
+                <option value="IT">BSIT</option>
+                <option value="EMC">BSEMC</option>
+              </select>
+            </label>
           </p>
 
           {/* Summary cards */}
@@ -372,64 +495,41 @@ export default function Dashboard() {
                     {Number.isFinite(card.value) ? card.value : 0}
                   </span>
                 )}
-              </div>
+              </div> 
             ))}
           </section>
 
-          <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
-              {emcConfirmedData && emcConfirmedData.length ? (
-                <QuickChart
-                  type="BarChart"
-                  className="mt-4"
-                  style={{ width: '100%', height: 'auto' }}
-                  data={emcConfirmedData}
-                  options={{
-                    backgroundColor: 'transparent',
-                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                    slices: { 0: { color: '#7d102a' } },
-                  }}
-                  engine="quickchart"
-                />
-              ) : (
-                <div className="text-sm text-[#a86a74] mt-4">No data.</div>
-              )}
-            </div>
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
-              {itConfirmedData && itConfirmedData.length ? (
-                <QuickChart
-                  type="BarChart"
-                  className="mt-4"
-                  style={{ width: '100%', height: 'auto' }}
-                  data={itConfirmedData}
-                  options={{
-                    backgroundColor: 'transparent',
-                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                    slices: { 0: { color: '#7d102a' } },
-                  }}
-                  engine="quickchart"
-                />
-              ) : (
-                <div className="text-sm text-[#a86a74] mt-4">No data.</div>
-              )}
-            </div>
-          </section>
-
-          {
-            <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
-                {(() => {
-                  const rows = (batches && batches.length ? batches : FALLBACK_BATCHES).map((b) => [String(b.code || b.label || '—'), Number(b.count ?? b.value ?? 0)])
-                  const data = [["Batch", "Count"], ...rows]
-                  return (
+          {activeTab === 'overview' && (
+          <section className="mt-6 grid grid-cols-1 grid-rows-4 gap-3">
+            {(courseFilter === 'IT') && (
+              <div className="grid grid-cols-2 h-[20%] gap-8">
+                <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <div>
+                    <QuickChart
+                      type="PieChart"
+                      className=""
+                      style={{ width: 360, height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#f4c3ce' }, 1: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSIT</h2>
+                  {itPassersStrandData && itPassersStrandData.length ? (
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 'auto' }}
-                      data={data}
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
+                      token={token}
                       options={{
                         backgroundColor: 'transparent',
                         legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
@@ -437,105 +537,181 @@ export default function Dashboard() {
                       }}
                       engine="quickchart"
                     />
-                  )
-                })()}
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+                  {itConfirmedData && itConfirmedData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '70%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
               </div>
-              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
-                <QuickChart
-                  type="PieChart"
-                  className="mt-4"
-                  style={{ width: '100%', height: 'auto' }}
-                  data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
-                  options={{
-                    backgroundColor: 'transparent',
-                    legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                    slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
-                  }}
-                  engine="quickchart"
-                />
-              </div>
-            </section>
-          }
-
-          <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
-              <div className="mt-4">
-                {emcTop.length === 0 ? (
-                  <div className="text-sm text-[#a86a74]">No data.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-[#7d102a]">
-                      <thead>
-                        <tr className="text-xs text-[#a86a74]">
-                          <th className="text-left px-2 py-2">#</th>
-                          <th className="text-left px-2 py-2">Last Name</th>
-                          <th className="text-left px-2 py-2">First Name</th>
-                          <th className="text-left px-2 py-2">Email Address</th>
-                          <th className="text-left px-2 py-2">Final Score</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {emcTop.map((row, idx) => (
-                          <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
-                            <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
-                            <td className="px-2 py-2">{row.lastName || '—'}</td>
-                            <td className="px-2 py-2">{row.firstName || '—'}</td>
-                            <td className="px-2 py-2">{row.email || '—'}</td>
-                            <td className="px-2 py-2">
-                              <div className="font-semibold">{row.finalScore || '—'}</div>
-                              <div className="text-xs text-[#a86a74]">
-                                Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            )}
+            {(courseFilter === 'EMC') && (
+              <div className="grid grid-cols-2 h-[20%] gap-8">
+                <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <div>
+                    <QuickChart
+                      type="PieChart"
+                      className=""
+                      style={{ width: 360, height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#f4c3ce' }, 1: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
                   </div>
-                )}
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSEMC</h2>
+                  {emcPassersStrandData && emcPassersStrandData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcPassersByStrand' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
+                  {emcConfirmedData && emcConfirmedData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '70%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcConfirmedByPercentile' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
-              <div className="mt-4">
-                {itTop.length === 0 ? (
-                  <div className="text-sm text-[#a86a74]">No data.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-[#7d102a]">
-                      <thead>
-                        <tr className="text-xs text-[#a86a74]">
-                          <th className="text-left px-2 py-2">#</th>
-                          <th className="text-left px-2 py-2">Last Name</th>
-                          <th className="text-left px-2 py-2">First Name</th>
-                          <th className="text-left px-2 py-2">Email Address</th>
-                          <th className="text-left px-2 py-2">Final Score</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {itTop.map((row, idx) => (
-                          <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
-                            <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
-                            <td className="px-2 py-2">{row.lastName || '—'}</td>
-                            <td className="px-2 py-2">{row.firstName || '—'}</td>
-                            <td className="px-2 py-2">{row.email || '—'}</td>
-                            <td className="px-2 py-2">
-                              <div className="font-semibold">{row.finalScore || '—'}</div>
-                              <div className="text-xs text-[#a86a74]">
-                                Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </section>
+          )}
+
+          {activeTab === 'leaderboards' && (
+          <section className="mt-6 grid grid-cols-1 gap-6">
+            {(courseFilter === 'EMC') && (
+              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
+                <div className="mt-4">
+                  {emcTop.length === 0 ? (
+                    <div className="text-sm text-[#a86a74]">No data.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-[#7d102a]">
+                        <thead>
+                          <tr className="text-xs text-[#a86a74]">
+                            <th className="text-left px-2 py-2">#</th>
+                            <th className="text-left px-2 py-2">Last Name</th>
+                            <th className="text-left px-2 py-2">First Name</th>
+                            <th className="text-left px-2 py-2">Email Address</th>
+                            <th className="text-left px-2 py-2">Final Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {emcTop.map((row, idx) => (
+                            <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                              <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                              <td className="px-2 py-2">{row.lastName || '—'}</td>
+                              <td className="px-2 py-2">{row.firstName || '—'}</td>
+                              <td className="px-2 py-2">{row.email || '—'}</td>
+                              <td className="px-2 py-2">
+                                <div className="font-semibold">{row.finalScore || '—'}</div>
+                                <div className="text-xs text-[#a86a74]">
+                                  Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {(courseFilter === 'IT') && (
+              <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+                <div className="mt-4">
+                  {itTop.length === 0 ? (
+                    <div className="text-sm text-[#a86a74]">No data.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-[#7d102a]">
+                        <thead>
+                          <tr className="text-xs text-[#a86a74]">
+                            <th className="text-left px-2 py-2">#</th>
+                            <th className="text-left px-2 py-2">Last Name</th>
+                            <th className="text-left px-2 py-2">First Name</th>
+                            <th className="text-left px-2 py-2">Email Address</th>
+                            <th className="text-left px-2 py-2">Final Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {itTop.map((row, idx) => (
+                            <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                              <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                              <td className="px-2 py-2">{row.lastName || '—'}</td>
+                              <td className="px-2 py-2">{row.firstName || '—'}</td>
+                              <td className="px-2 py-2">{row.email || '—'}</td>
+                              <td className="px-2 py-2">
+                                <div className="font-semibold">{row.finalScore || '—'}</div>
+                                <div className="text-xs text-[#a86a74]">
+                                  Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+          )}
 
           {/* Google Calendar UI */}
           <section className="mt-6">
@@ -567,9 +743,9 @@ export default function Dashboard() {
 
         {/* Right column */}
         <aside className="border-l border-[#efccd2] bg-[#fbf3f4] px-6 py-8">
-          <div className="rounded-3xl bg-gradient-to-b from-[#efc4cd] to-[#f5d8de] p-5 shadow-[0_14px_28px_rgba(139,23,47,0.08)]">
+          <div className="rounded-3xl bg-gradient-to-b from-[#efc4cd] to-[#f5d8de] p-5 shadow-[0_14px_28px_rgba(139,23,47,0.08)] relative">
             {/* Top bar: left search, right bell + name + caret */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-start">
               {/* Left: compact search (kept) */}
               {/* <div className="relative" style={{ width: "220px" }}>
                 <input
@@ -591,20 +767,60 @@ export default function Dashboard() {
                 </span>
               </div> */}
 
-              {/* Right: bell | divider | name + caret */}
+              {/* Right: name with bell + caret */}
               <div className="flex items-center gap-3 text-[#2f2b33]">
-                <svg viewBox="0 0 20 20" className="w-5 h-5 fill-current">
-                  <path d="M10 18a2 2 0 002-2H8a2 2 0 002 2zm6-6V9a6 6 0 10-12 0v3l-2 2v1h16v-1l-2-2z" />
-                </svg>
-                <span className="h-5 w-px bg-[#b67a86]/60" />
-                <span className="text-base font-semibold">
-                  {/* {user?.firstName || "Santiago"} {user?.lastName || "Garcia"} */}
+                <button
+                  type="button"
+                  aria-label="Notifications"
+                  onClick={() => setShowNotifications(v => !v)}
+                  className="relative flex items-center justify-center w-7 h-7 rounded-full bg-white text-[#2f2b33] border border-[#efccd2] hover:bg-[#f8e7eb]"
+                >
+                  <svg viewBox="0 0 20 20" className="w-5 h-5 fill-current">
+                    <path d="M10 18a2 2 0 002-2H8a2 2 0 002  2zm6-6V9a6 6 0 10-12 0v3l-2 2v1h16v-1l-2-2z" />
+                  </svg>
+                  {activities.some(ev => String(ev.action || '').toLowerCase().includes('accepted')) && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#8a1d35] text-white text-[10px] leading-4 text-center">
+                      {Math.min(99, activities.filter(ev => String(ev.action || '').toLowerCase().includes('accepted')).length)}
+                    </span>
+                  )}
+                </button>
+                <span className="text-base font-semibold inline-flex items-center gap-2">
                   Department Head
                 </span>
                 <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current">
                   <path d="M5.5 7.5l4.5 5 4.5-5H5.5z" />
                 </svg>
               </div>
+              {showNotifications && (
+                <div className="absolute left-5 top-14 z-10 w-[300px] rounded-xl bg-white border border-[#efccd2] shadow-[0_12px_24px_rgba(139,23,47,0.12)]">
+                  <div className="px-4 py-3 border-b border-[#efccd2] text-sm font-semibold text-[#7d102a]">Notifications</div>
+                  <div className="max-h-[280px] overflow-y-auto">
+                    {activities.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-[#a86a74]">No notifications.</div>
+                    ) : (
+                      activities.slice(0, 10).map((ev, idx) => {
+                        const when = ev.when || ev.createdAt;
+                        const label = `${ev.actor || ''}`.trim() || 'Officer';
+                        const accepted = String(ev.action || '').toLowerCase().includes('accepted');
+                        return (
+                          <div key={idx} className="px-4 py-3 border-t border-[#f2d8dd] text-sm text-[#7d102a] flex items-center gap-3">
+                            <PlaceholderIcon size="w-8 h-8" variant="secondary" label="OK" />
+                            <div className="flex-1">
+                              <div className="font-semibold">{label}</div>
+                              <div className="text-xs text-[#a86a74]">
+                                {accepted ? `Accepted invite ${timeAgo(when)}` : `${ev.action || 'Activity'} ${timeAgo(when)}`}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                  <div className="px-4 py-2 text-right">
+                    <button onClick={() => setShowNotifications(false)} className="h-7 rounded-md border border-[#efccd2] px-3 text-[12px] text-[#7d102a] hover:bg-[#f8e7eb]">Close</button>
+                  </div>
+                </div>
+              )}
             </div>
             {/* Search bar */}
             <div className="mt-3 relative w-full">

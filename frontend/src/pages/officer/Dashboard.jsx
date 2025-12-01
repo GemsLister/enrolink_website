@@ -302,7 +302,7 @@ export default function OfficerDashboard() {
                   <QuickChart
                     type="BarChart"
                     className="mt-4"
-                    style={{ width: '100%', height: 'auto' }}
+                    style={{ width: '70%', height: 360 }}
                     data={data}
                     options={{
                       backgroundColor: 'transparent',
@@ -319,7 +319,7 @@ export default function OfficerDashboard() {
               <QuickChart
                 type="PieChart"
                 className="mt-4"
-                style={{ width: '100%', height: 'auto' }}
+                style={{ width: '70%', height: 360 }}
                 data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
                 options={{
                   backgroundColor: 'transparent',

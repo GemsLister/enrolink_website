@@ -1,6 +1,8 @@
 import { getStudentModel } from '../models/Student.js';
 import { getBatchModel } from '../models/Batch.js';
 import { getInterviewModel } from '../models/Interview.js';
+import { getOfficerUserModel } from '../models/User.js';
+import HeadUser from '../models/HeadUser.js';
 import { statsFromBigQuery } from '../services/google/bigquery.js';
 
 export async function stats(req, res, next) {
@@ -15,7 +17,7 @@ export async function stats(req, res, next) {
 
     const Student = getStudentModel();
     const Batch = getBatchModel();
-    const Interview = getInterviewModel();
+  const Interview = getInterviewModel();
 
     let batchIds = undefined;
     if (year) {
@@ -61,14 +63,117 @@ export async function stats(req, res, next) {
     const base = interviewed || total || 0;
     const pie = [
       ['Result', 'Percent'],
-      ['Failed', base ? Math.max(0, 100 - Math.min(100, Math.round((passed / base) * 100))) : 100],
       ['Passed', base ? Math.min(100, Math.round((passed / base) * 100)) : 0],
+      ['Failed', base ? Math.max(0, 100 - Math.min(100, Math.round((passed / base) * 100))) : 100],
     ];
     const column = [
       ['Batch', 'Count'],
       ...batchAnalytics.map(b => [String(b.code || ''), Number(b.count || 0)]),
     ];
-    res.json({ totals: { totalApplicants: total, interviewed, passedInterview: passed, enrolled, awol }, batchAnalytics, charts: { passRatePie: pie, batchesColumn: column } });
+
+    // Additional charts: passers by SHS strand and confirmed interviewees distribution by percentile
+    const students = await Student.find(match)
+      .select('firstName lastName course preferredCourse shsStrand interviewerDecision interviewDate percentileScore finalScore status')
+      .lean();
+    const classifyCourse = (s) => {
+      const c = String(s.course || s.preferredCourse || '').toUpperCase();
+      if (c.includes('EMC')) return 'EMC';
+      if (c.includes('IT')) return 'IT';
+      return 'OTHER';
+    };
+    const byCourse = { EMC: [], IT: [] };
+    for (const s of students) {
+      const k = classifyCourse(s);
+      if (k === 'EMC') byCourse.EMC.push(s);
+      else if (k === 'IT') byCourse.IT.push(s);
+    }
+    const normStrand = (t) => {
+      const v = String(t || '').trim().toUpperCase();
+      if (!v) return '';
+      if (v.includes('STEM')) return 'STEM';
+      if (v.includes('ABM')) return 'ABM';
+      if (v.includes('HUMSS')) return 'HUMSS';
+      if (v.includes('TVL')) return 'TVL-ICT';
+      return v;
+    };
+    const buildPassersByStrand = (rows) => {
+      const passedRows = rows.filter(r => {
+        const s = String(r.status || '').toUpperCase();
+        const d = String(r.interviewerDecision || '').toUpperCase();
+        return s === 'PASSED' || s === 'ENROLLED' || d === 'PASSED';
+      });
+      const counts = new Map();
+      for (const r of passedRows) {
+        const key = normStrand(r.shsStrand);
+        if (!key) continue;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const labels = Array.from(counts.keys()).sort((a,b) => {
+        const order = { 'STEM': 0, 'ABM': 1, 'HUMSS': 2, 'TVL-ICT': 3 };
+        const ai = order[a] ?? 99;
+        const bi = order[b] ?? 99;
+        return ai - bi;
+      });
+      const rowsData = labels.map(l => [l, counts.get(l)]);
+      const totalPassed = passedRows.length;
+      rowsData.push(['Grand Total', totalPassed]);
+      return [['SHS Strand','No. of Students who passed interview'], ...rowsData];
+    };
+
+    // Map exam scores by student name (fallback)
+    const ivRows = await Interview.find(ivFilter).select('studentName examScore').lean();
+    const examMap = new Map();
+    for (const iv of ivRows) {
+      const key = String(iv.studentName || '').trim().toLowerCase();
+      if (key) examMap.set(key, iv.examScore);
+    }
+    const formatPct = (val) => {
+      if (val === undefined || val === null || val === '') return '';
+      if (typeof val === 'number' && Number.isFinite(val)) return `${val.toFixed(2)}%`;
+      const txt = String(val).trim();
+      const m = txt.match(/^(\d+(?:\.\d+)?)\s*%?$/);
+      return m ? `${parseFloat(m[1]).toFixed(2)}%` : txt;
+    };
+    const buildConfirmedByPercentile = (rows) => {
+      const list = rows; // default: include all interviewees
+      const counts = new Map();
+      for (const r of list) {
+        const name1 = `${r.firstName || ''} ${r.lastName || ''}`.trim().toLowerCase();
+        const name2 = `${r.lastName || ''} ${r.firstName || ''}`.trim().toLowerCase();
+        const fallback = examMap.get(name1) ?? examMap.get(name2);
+        const label = formatPct(r.percentileScore ?? r.finalScore ?? fallback);
+        if (!label) continue;
+        counts.set(label, (counts.get(label) || 0) + 1);
+      }
+      const labels = Array.from(counts.keys()).sort((a,b) => {
+        const pa = parseFloat(String(a).replace('%',''));
+        const pb = parseFloat(String(b).replace('%',''));
+        if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb;
+        return String(a).localeCompare(String(b));
+      });
+      const rowsData = labels.map(l => [l, counts.get(l)]);
+      const total = list.length;
+      rowsData.push(['Grand Total', total]);
+      return [['Percentile Score','No of Confirmed Interviewees'], ...rowsData];
+    };
+
+    const emcPassersByStrand = buildPassersByStrand(byCourse.EMC);
+    const itPassersByStrand = buildPassersByStrand(byCourse.IT);
+    const emcConfirmedByPercentile = buildConfirmedByPercentile(byCourse.EMC);
+    const itConfirmedByPercentile = buildConfirmedByPercentile(byCourse.IT);
+
+    res.json({
+      totals: { totalApplicants: total, interviewed, passedInterview: passed, enrolled, awol },
+      batchAnalytics,
+      charts: {
+        passRatePie: pie,
+        batchesColumn: column,
+        emcPassersByStrand,
+        itPassersByStrand,
+        emcConfirmedByPercentile,
+        itConfirmedByPercentile
+      }
+    });
   } catch (e) { next(e); }
 }
 
@@ -76,6 +181,7 @@ export async function activity(req, res, next) {
   try {
     const Student = getStudentModel();
     const Batch = getBatchModel();
+    const OfficerUser = getOfficerUserModel();
 
     const year = req.query.year ? String(req.query.year) : '';
     let batchIds = undefined;
@@ -104,10 +210,10 @@ export async function activity(req, res, next) {
       actor = byName || byFirstLast || byEmail || 'System';
     }
 
-    const events = rows.map(s => {
+    const studentEvents = rows.map(s => {
       const created = new Date(s.createdAt).getTime();
       const updated = new Date(s.updatedAt).getTime();
-      const isAdded = Math.abs(updated - created) < 5000; // 5s threshold
+      const isAdded = Math.abs(updated - created) < 5000;
       let action = 'edited a student.';
       if (isAdded) action = 'added a student.';
       if (String(s.status).toUpperCase() === 'AWOL') action = 'archive a student.';
@@ -119,7 +225,43 @@ export async function activity(req, res, next) {
       };
     });
 
-    res.json({ events });
+    const oMatch = year ? { role: 'OFFICER', assignedYear: year } : { role: 'OFFICER' };
+    const oRows = await OfficerUser.find(oMatch)
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('name email createdAt updatedAt')
+      .lean();
+
+    const officerEvents = oRows.map(o => {
+      const created = new Date(o.createdAt).getTime();
+      const updated = new Date(o.updatedAt).getTime();
+      const isAdded = Math.abs(updated - created) < 5000;
+      if (!isAdded) return null;
+      const who = (o.name || o.email || 'Officer').toString();
+      return {
+        id: String(o._id || o.email || created),
+        actor: who,
+        action: 'accepted the officer invitation.',
+        when: o.createdAt,
+      };
+    }).filter(Boolean);
+
+    try {
+      if (req.user && req.user.role === 'DEPT_HEAD') {
+        const prefs = await HeadUser.findById(req.user.id).select('notifSystem').lean();
+        if (prefs && prefs.notifSystem === false) {
+          officerEvents.splice(0, officerEvents.length);
+        }
+      }
+    } catch (_) {}
+
+    const combined = [...studentEvents, ...officerEvents].sort((a, b) => {
+      const ta = new Date(a.when).getTime();
+      const tb = new Date(b.when).getTime();
+      return tb - ta;
+    }).slice(0, 20);
+
+    res.json({ events: combined });
   } catch (e) { next(e); }
 }
 
