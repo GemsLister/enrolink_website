@@ -9,6 +9,7 @@ export default function ArchivePage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -47,45 +48,101 @@ export default function ArchivePage() {
   if (!user || user.role !== 'DEPT_HEAD') return <Navigate to="/" replace />
 
   return (
-    <div className="flex">
+    <div className="min-h-screen flex">
       <Sidebar />
-      <main className="flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto h-[100dvh]">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">ARCHIVE</h1>
-            <p className="text-lg text-[#2f2b33] mt-3">Welcome to archive.</p>
+      <main className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-hidden">
+        <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="uppercase tracking-[0.25em] text-sm text-[#5b1a30]">Records</div>
+              <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Archive</h1>
+              <p className="text-base text-[#5b1a30]">Archived officers and batches</p>
+            </div>
+            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
+              <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+              </button>
+              <span className="h-5 w-px bg-[#e4b7bf]" />
+              <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+            </div>
           </div>
-        </div>
-        {error && (<div className="text-sm text-red-700 mb-2">{error}</div>)}
-        <div className="bg-white rounded-[13px] border border-[#efccd2] overflow-hidden">
-          <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3">Archived Items</div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-3 px-5 text-left">Date</th>
-                  <th className="py-3 px-5 text-left">Type</th>
-                  <th className="py-3 px-5 text-left">Name</th>
-                  <th className="py-3 px-5 text-left">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan="4" className="py-4 px-3 text-center text-sm">Loading…</td></tr>
-                ) : items.length === 0 ? (
-                  <tr><td colSpan="4" className="py-4 px-3 text-center text-sm">No archived items</td></tr>
-                ) : items.map(it => (
-                  <tr key={it.id} className="hover:bg-gray-50">
-                    <td className="py-3 px-5">{it.date ? new Date(it.date).toLocaleDateString() : '-'}</td>
-                    <td className="py-3 px-5">{it.type}</td>
-                    <td className="py-3 px-5">{it.name}</td>
+          {error && (<div className="text-sm text-red-700 mb-2">{error}</div>)}
+          <div className="w-full max-w-sm">
+            <input
+              type="text"
+              placeholder="Search name"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-[#7d102a] font-semibold text-sm">Archived Items</span>
+          </div>
+          <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] overflow-hidden border border-[#f7d6d6]">
+            <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="min-w-[1800px] border-collapse">
+                <thead>
+                  <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
+                    <th className="py-4 px-5 text-left sticky top-0 z-20 bg-[#f9c4c4]">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Date</span>
+                      </div>
+                    </th>
+                    <th className="py-4 px-5 text-left sticky top-0 z-20 bg-[#f9c4c4]">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Type</span>
+                      </div>
+                    </th>
+                    <th className="py-4 px-5 text-left sticky top-0 z-20 bg-[#f9c4c4]">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Name</span>
+                      </div>
+                    </th>
+                    <th className="py-4 px-5 text-left sticky top-0 z-20 bg-[#f9c4c4]">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Action</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan="4" className="py-4 px-3 text-center text-sm">Loading…</td></tr>
+                  ) : items
+                    .filter((it) => {
+                      const q = (query || '').toLowerCase().trim()
+                      if (!q) return true
+                      return (
+                        (it.name || '').toLowerCase().includes(q) ||
+                        (it.type || '').toLowerCase().includes(q)
+                      )
+                    })
+                    .length === 0 ? (
+                    <tr><td colSpan="4" className="py-4 px-3 text-center text-sm">No archived items</td></tr>
+                  ) : items
+                    .filter((it) => {
+                      const q = (query || '').toLowerCase().trim()
+                      if (!q) return true
+                      return (
+                        (it.name || '').toLowerCase().includes(q) ||
+                        (it.type || '').toLowerCase().includes(q)
+                      )
+                    })
+                    .map((it, idx) => (
+                  <tr key={it.id} className={`border-b border-[#f3d5d5] hover:bg-rose-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-[#fff2f4]'}`}>
+                    <td className="py-3 px-5 text-[#7c3a4a]">{it.date ? new Date(it.date).toLocaleDateString() : '-'}</td>
+                    <td className="py-3 px-5 text-[#7c3a4a]">{it.type}</td>
+                    <td className="py-3 px-5 text-[#5b1a30]">{it.name}</td>
                     <td className="py-3 px-5">
-                      <button onClick={() => restore(it)} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-3 py-1 rounded-full hover:bg-pink-50 transition-colors duration-200 text-xs">Restore</button>
+                      <button onClick={() => restore(it)} className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#6b0000] hover:bg-rose-50">Restore</button>
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>

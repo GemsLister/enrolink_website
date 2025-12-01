@@ -40,22 +40,17 @@ export default function BatchFilters({
             {interviewerOptions.map(opt => (<option key={opt} value={opt}>{`Interviewer: ${opt}`}</option>))}
           </select>
         </div> */}
-        <div className="flex items-center max-w-xl">
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-            </svg>
-            <input type="text" placeholder="search" className="w-[25rem] pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </div>
+        <div className="w-full max-w-sm">
+          <input type="text" placeholder="Search name" className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4" />
           <div className="flex items-center gap-2">
             {selectedIds.size > 0 && (
-              <button onClick={handleDeleteSelected} className="bg-[#E49C9E] text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium">Archive ({selectedIds.size})</button>
+              <button onClick={handleDeleteSelected} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Archive ({selectedIds.size})</button>
             )}
-            <button onClick={handleAddBatch} className="bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-900 transition-colors duration-200 font-medium">Add Batch</button>
+            <button onClick={handleAddBatch} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]">Add Batch</button>
           </div>
         </div>
       </div>

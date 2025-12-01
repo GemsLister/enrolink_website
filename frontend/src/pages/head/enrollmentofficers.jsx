@@ -237,32 +237,37 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
   const duplicateArchivedOfficer = archivedOfficers.some(o => String(o.email || '').toLowerCase() === String(email || '').trim().toLowerCase());
 
   return (
-    <div className="flex">
+    <div className="min-h-screen flex">
       <Sidebar />
-      <main className="flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto h-[100dvh]">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">ENROLLMENT OFFICERS</h1>
-            <p className="text-lg text-[#2f2b33] mt-3">List of current enrollment officers</p>
+      <main className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-hidden">
+        <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
+          <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="uppercase tracking-[0.25em] text-sm text-[#5b1a30]">Records</div>
+              <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Enrollment Officers</h1>
+              <p className="text-base text-[#5b1a30]">List of current enrollment officers</p>
+            </div>
+            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
+              <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+              </button>
+              <span className="h-5 w-px bg-[#e4b7bf]" />
+              <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+            </div>
           </div>
-        </div>
 
         <div className="flex items-center gap-4 mb-4">
-          <div className="relative" style={{ width: '260px' }}>
+          <div className="w-full max-w-sm">
             <input
-              type="search"
-              placeholder="search"
+              type="text"
+              placeholder="Search name"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-9 w-full rounded-full bg-white pl-9 pr-3 text-sm text-[#2f2b33] placeholder:text-[#8c7f86] outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]"
+              className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
             />
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#8a1d35] border border-[#efccd2]">
-                <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current"><path d="M12.9 14.32a8 8 0 111.41-1.41l4.3 4.3-1.41 1.41-4.3-4.3zM8 14a6 6 0 100-12 6 6 0 000 12z"/></svg>
-              </div>
-            </span>
           </div>
-          <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border border-[#e4b7bf] text-[#8a1d35] bg-white hover:bg-[#fff5f7]">Pending invites</button>
+          <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Pending invites</button>
           <div className="relative">
             <button type="button" onClick={() => setShowNotif(v => !v)} className="flex items-center justify-center w-9 h-9 rounded-full bg-white text-[#2f2b33] border border-[#efccd2] hover:bg-[#fff5f7]">
               <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
@@ -296,16 +301,16 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
           </div>
         </div>
 
-        <div className="bg-white rounded-[13px] border border-[#efccd2] p-0 overflow-hidden">
-          <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3 flex items-center justify-between">
-            <span>Current Officers</span>
-            <button onClick={() => setShowAddModal(true)} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Add Officer</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="w-12 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-[#7d102a] font-semibold text-sm">Current Officers</span>
+          <button onClick={() => setShowAddModal(true)} className="rounded-full bg-[#c4375b] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]">Add Officer</button>
+        </div>
+        <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 overflow-hidden border border-[#f7d6d6]">
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="min-w-[1800px] border-collapse">
+              <thead>
+                <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
+                  <th className="w-12 px-4 py-4 text-center sticky top-0 z-20 bg-[#f9c4c4]">
                     <input
                       type="checkbox"
                       className="h-4 w-4 text-[#6b0000] focus:ring-[#6b0000] border-gray-300 rounded"
@@ -316,12 +321,36 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="w-56 text-left py-2 px-3 text-xs font-medium text-gray-700">Name</th>
-                  <th className="w-64 text-left py-2 px-3 text-xs font-medium text-gray-700">Email</th>
-                  <th className="w-32 text-left py-2 px-3 text-xs font-medium text-gray-700">Batch</th>
-                  <th className="w-40 text-left py-2 px-3 text-xs font-medium text-gray-700">Contact #</th>
-                  <th className="w-32 text-left py-2 px-3 text-xs font-medium text-gray-700">Date Created</th>
-                  <th className="w-32 text-right py-2 px-3 text-xs font-medium text-gray-700">Actions</th>
+                  <th className="w-56 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Name</span>
+                    </div>
+                  </th>
+                  <th className="w-64 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Email</span>
+                    </div>
+                  </th>
+                  <th className="w-32 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Batch</span>
+                    </div>
+                  </th>
+                  <th className="w-40 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Contact #</span>
+                    </div>
+                  </th>
+                  <th className="w-32 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Date Created</span>
+                    </div>
+                  </th>
+                  <th className="w-32 text-right px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
+                    <div className="flex items-center justify-end gap-3 text-xs">
+                      <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Actions</span>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -337,11 +366,10 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                       (batchCode || '').toLowerCase().includes(q)
                     );
                   })
-                  .map((officer) => (
+                  .map((officer, idx) => (
                   <tr
                     key={officer._id}
-                    className={`hover:bg-gray-50 ${selectedOfficers.includes(officer._id) ? "bg-blue-50" : ""
-                      }`}
+                    className={`border-b border-[#f3d5d5] hover:bg-rose-50 ${selectedOfficers.includes(officer._id) ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-[#fff2f4]')}`}
                   >
                     <td className="w-12 px-4 py-3 text-center align-middle whitespace-nowrap">
                       <input
@@ -351,18 +379,18 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                         onChange={() => toggleOfficerSelection(officer._id)}
                       />
                     </td>
-                    <td className="w-56 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
+                    <td className="w-56 py-2 px-3 text-[#5b1a30] align-middle whitespace-nowrap text-left">
                       {officer.name || "-"}
                     </td>
-                    <td className="w-64 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">{officer.email}</td>
+                    <td className="w-64 py-2 px-3 text-[#7c3a4a] align-middle whitespace-nowrap text-left">{officer.email}</td>
                     <td className="w-32 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
                       {(() => {
                         const b = batches.find((x) => x._id === officer.assignedBatch) || batches.find((x)=> x.code === officer.assignedBatch);
                         return b ? (b.code || b.name) : '-';
                       })()}
                     </td>
-                    <td className="w-40 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">{officer.contact || '-'}</td>
-                    <td className="w-32 py-2 px-3 text-gray-800 align-middle whitespace-nowrap text-left">
+                    <td className="w-40 py-2 px-3 text-[#7c3a4a] align-middle whitespace-nowrap text-left">{officer.contact || '-'}</td>
+                    <td className="w-32 py-2 px-3 text-[#7c3a4a] align-middle whitespace-nowrap text-left">
                       {officer.createdAt
                         ? new Date(officer.createdAt).toLocaleDateString()
                         : "-"}
@@ -384,7 +412,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                 <button
                   onClick={() => setShowBulkArchiveModal(true)}
                   disabled={isDeleting}
-                  className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200 text-sm"
+                  className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60"
                 >
                   {isDeleting
                     ? "Archiving..."
@@ -519,6 +547,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );

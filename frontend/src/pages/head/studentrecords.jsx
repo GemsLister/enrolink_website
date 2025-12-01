@@ -70,20 +70,20 @@ const STUDENT_COLUMNS = [
 ]
 
 const IMPORT_HEADERS_APPLICANTS = [
-  { key: 'number', label: 'no' },
+  { key: 'number', label: 'no.' },
   { key: 'course', label: 'course' },
-  { key: 'examineeNo', label: 'examinee_no' },
+  { key: 'examineeNo', label: 'examinee no.' },
   { key: 'source', label: 'source' },
   { key: 'lastName', label: 'lastname' },
   { key: 'firstName', label: 'firstname' },
-  { key: 'middleName', label: 'middle_name' },
+  { key: 'middleName', label: 'middle name' },
   { key: 'email', label: 'email' },
   { key: 'percentileScore', label: 'percentile' },
   { key: 'shsStrand', label: 'strand' },
   { key: 'shs', label: 'shs' },
   { key: 'contact', label: 'contact' },
   { key: 'shsGpa', label: 'shs_gpa' },
-  { key: 'interviewDate', label: 'interview_date' },
+  { key: 'interviewDate', label: 'interview date' },
   { key: 'academicTechnicalBackground', label: 'rating_academic' },
   { key: 'skillsCompetencies', label: 'rating_skills' },
   { key: 'timeManagement', label: 'rating_teamwork' },
@@ -93,7 +93,7 @@ const IMPORT_HEADERS_APPLICANTS = [
   { key: 'qScore', label: 'q_score' },
   { key: 'interviewerDecision', label: 'decision' },
   { key: 'sScore', label: 's_score' },
-  { key: 'finalScore', label: 'final_score' },
+  { key: 'finalScore', label: 'final score' },
   { key: 'remarks', label: 'remarks' },
 ]
 
@@ -269,7 +269,8 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
 
   const header = rawRows[0].map((cell) => normalizeText(cell).toLowerCase())
   const expectedHeaders = importHeaders.map((h) => h.label)
-  const isValid = expectedHeaders.every((label, index) => header[index] === label)
+  const headerMap = Object.fromEntries(header.map((h, i) => [h, i]))
+  const isValid = expectedHeaders.every((label) => headerMap[label] !== undefined)
   if (!isValid) {
     throw new Error('Column headers do not match the required template.')
   }
@@ -279,8 +280,9 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
   return dataRows
     .map((row) => {
       if (!row || row.every((cell) => normalizeText(cell) === '')) return null
-      const record = importHeaders.reduce((acc, column, idx) => {
-        const rawValue = row[idx]
+      const record = importHeaders.reduce((acc, column) => {
+        const idx = headerMap[column.label]
+        const rawValue = idx !== undefined ? row[idx] : ''
         if (column.key === 'course') {
           const normalized = normalizeText(rawValue).toUpperCase()
           acc[column.key] = normalized === 'BSIT' || normalized === 'BSEMC-DAT' ? normalized : ''
@@ -828,6 +830,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       return
     }
     const payload = { ...editingValues }
+    if (currentCategory === 'Enrollee') {
+      const status = normalizeText(payload.enrollmentStatus).toUpperCase()
+      payload.enrollmentStatus = ENROLLMENT_STATUS_OPTIONS.includes(status) ? status : 'PENDING'
+    } else {
+      delete payload.enrollmentStatus
+    }
     if (editingMeta?.id) {
       payload.id = editingMeta.id
       if (editingMeta?.__v !== undefined) payload.__v = editingMeta.__v
@@ -853,12 +861,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const handler = (event) => {
       if (!editingRowRef.current) return
       if (!editingRowRef.current.contains(event.target)) {
-        void saveEditing()
+        cancelEditing()
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [editingId, saveEditing])
+  }, [editingId, cancelEditing])
 
   useEffect(() => {
     if (!editingId) restoreScroll()
@@ -889,6 +897,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     cancelEditing()
     const clientId = `temp-${Date.now()}`
     const freshRow = { ...EMPTY_RECORD, recordCategory: currentCategory, __clientId: clientId }
+    if (currentCategory === 'Enrollee') freshRow.enrollmentStatus = 'PENDING'
     setRows((prev) => [freshRow, ...prev.filter((row) => !row.__clientId)])
     beginEditing(freshRow, { isNew: true })
   }
@@ -1062,7 +1071,16 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
         <div className="flex flex-col gap-6">
           <div className="space-y-2">
-            <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+            <div className="flex items-center justify-between">
+              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+              <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 border-2 border-[#6b2b2b]">
+                <button type="button" className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+                </button>
+                <span className="h-5 w-px bg-[#e4b7bf]" />
+                <span className="text-gray-800 font-medium inline-flex items-center gap-1">Santiago Garcia <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+              </div>
+            </div>
             <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
             <p className="text-base text-[#8b4a5d] max-w-3xl">{headerSubtitle}</p>
             <div className="w-full max-w-sm mt-2">
@@ -1163,7 +1181,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           <div ref={tableScrollRef} onScroll={handleTableScroll} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
             <table className="min-w-[1800px] border-collapse">
               <thead>
-                <tr className="bg-[#f9c4c4] text-[#5b1a30] text-sm font-semibold">
+                <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
                   <th style={{ minWidth: '60px' }} className="px-4 py-4 text-left sticky top-0 z-20 bg-[#f9c4c4]">
                     <input
                       type="checkbox"
