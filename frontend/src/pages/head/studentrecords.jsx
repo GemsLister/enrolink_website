@@ -35,6 +35,7 @@ const APPLICANT_COLUMNS = [
   { key: 'ethicsIntegrity', label: 'Ethics and Integrity', width: '200px' },
   { key: 'qScore', label: 'Q Score (40%) Interview Questions', width: '220px' },
   { key: 'interviewerDecision', label: 'Interviewer’s Decision', width: '200px' },
+  { key: 'pScore', label: 'P Score (30%) entrance exam', width: '220px' },
   { key: 'sScore', label: 'S Score (30%) GPA in SHS', width: '220px' },
   { key: 'finalScore', label: 'Final Score (Percentile Score, Q Score, S Score)', width: '260px' },
   { key: 'remarks', label: 'Remarks', width: '200px' },
@@ -129,7 +130,7 @@ const RATING_COLUMN_KEYS = new Set([
   'problemSolving',
   'ethicsIntegrity',
 ])
-const PERCENTAGE_COLUMN_KEYS = new Set(['percentileScore', 'qScore', 'sScore', 'finalScore'])
+const PERCENTAGE_COLUMN_KEYS = new Set(['percentileScore', 'pScore', 'qScore', 'sScore', 'finalScore'])
 const CATEGORY_OPTIONS = ['Applicant', 'Enrollee', 'Student']
 const SHS_STRAND_OPTIONS = ['STEM', 'ABM', 'HUMSS', 'TVL-ICT']
 const DECISION_OPTIONS = ['PASSED', 'FAILED', 'NO RESULT']
@@ -198,6 +199,35 @@ const titleCase = (value) => {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ')
+}
+
+const formatPercent = (value) => {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const num = Number(raw.replace(/%$/, ''))
+  if (!Number.isFinite(num)) return raw.endsWith('%') ? raw : `${raw}%`
+  return `${num.toFixed(2)}%`
+}
+
+const toNumber = (value) => {
+  const raw = String(value ?? '').trim()
+  const num = Number(raw.replace(/%$/, ''))
+  return Number.isFinite(num) ? num : 0
+}
+
+const computeQPercent = (src) => {
+  const k = ['academicTechnicalBackground','skillsCompetencies','timeManagement','communicationSkills','problemSolving','ethicsIntegrity']
+  const sum = k.reduce((acc, key) => acc + toNumber(src?.[key]), 0)
+  const pct = (sum / 30) * 100
+  return Number.isFinite(pct) ? pct : 0
+}
+
+const computeFinalPercent = (src) => {
+  const q = computeQPercent(src)
+  const p = toNumber(src?.percentileScore)
+  const s = toNumber(src?.shsGpa)
+  const final = (q * 0.4) + (p * 0.3) + (s * 0.3)
+  return Number.isFinite(final) ? final : 0
 }
 
 const normalizeText = (value, type) => {
@@ -308,6 +338,9 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
       } else if (!record.recordCategory) {
         record.recordCategory = 'Applicant'
       }
+      record.qScore = computeQPercent(record)
+      record.finalScore = computeFinalPercent(record)
+      if (!record.sScore) record.sScore = record.shsGpa || ''
       return record
     })
     .filter(Boolean)
@@ -717,6 +750,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             else if (bIdx === 1) comparison = 1
             else comparison = aIdx - bIdx
           }
+          } else if (RATING_COLUMN_KEYS.has(key)) {
+            const aNum = Number(aVal)
+            const bNum = Number(bVal)
+            if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+              comparison = direction === 'asc' ? aNum - bNum : bNum - aNum
+            } else {
+              comparison = compareString(String(aVal ?? ''), String(bVal ?? ''))
+              comparison = direction === 'asc' ? comparison : -comparison
+            }
           } else if (key === 'number') {
             const aNum = Number(aVal)
             const bNum = Number(bVal)
@@ -836,6 +878,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     } else {
       delete payload.enrollmentStatus
     }
+    payload.qScore = computeQPercent(payload)
+    payload.finalScore = computeFinalPercent(payload)
+    if (!payload.sScore) payload.sScore = payload.shsGpa || ''
     if (editingMeta?.id) {
       payload.id = editingMeta.id
       if (editingMeta?.__v !== undefined) payload.__v = editingMeta.__v
@@ -964,6 +1009,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const formatCell = (key, val) => {
       if (['firstName', 'middleName', 'lastName'].includes(key)) return normalizeText(val, 'name') || ''
       if (isStudentView && key === 'interviewDate') return normalizeDate(val, 'short') || ''
+      if (PERCENTAGE_COLUMN_KEYS.has(key) || key === 'pScore') return formatPercent(val)
       return String(val ?? '')
     }
 
@@ -984,7 +1030,14 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     y += 8
 
     const headAll = selectedCols.map((c) => findLabel(c.key))
-    const bodyAll = data.map((row) => selectedCols.map((c) => formatCell(c.key, row[c.key])))
+    const bodyAll = data.map((row) => selectedCols.map((c) => {
+      const key = c.key
+      if (key === 'pScore') return formatCell(key, row.percentileScore)
+      if (key === 'sScore') return formatCell(key, row.shsGpa)
+      if (key === 'qScore') return formatCell(key, computeQPercent(row))
+      if (key === 'finalScore') return formatCell(key, computeFinalPercent(row))
+      return formatCell(key, row[key])
+    }))
 
     autoTable(doc, {
       head: [headAll],
@@ -1359,7 +1412,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   >
                                     <option value="">Select</option>
-                                    {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
+                                    {Array.from({ length: 5 }, (_, idx) => String(idx + 1)).map((rating) => (
                                       <option key={rating} value={rating}>
                                         {rating}
                                       </option>
@@ -1379,7 +1432,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                       </option>
                                     ))}
                                   </select>
-                                ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
+                                ) : (PERCENTAGE_COLUMN_KEYS.has(column.key) && !['qScore','finalScore'].includes(column.key)) ? (
                                   <input
                                     type="text"
                                     value={editingValues[column.key] ?? ''}
@@ -1459,6 +1512,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                               ) : (
                                 <span>
                                   {(() => {
+                                    if (column.key === 'qScore') {
+                                      const src = isEditing ? editingValues : row
+                                      const formatted = formatPercent(computeQPercent(src))
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'finalScore') {
+                                      const src = isEditing ? editingValues : row
+                                      const formatted = formatPercent(computeFinalPercent(src))
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'pScore') {
+                                      const src = isEditing ? editingValues.percentileScore : row.percentileScore
+                                      const formatted = formatPercent(src)
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'sScore') {
+                                      const src = isEditing ? editingValues.shsGpa : row.shsGpa
+                                      const formatted = formatPercent(src)
+                                      return formatted || '—'
+                                    }
+                                    if (PERCENTAGE_COLUMN_KEYS.has(column.key)) {
+                                      const formatted = formatPercent(value)
+                                      return formatted || '—'
+                                    }
                                     if (['firstName', 'middleName', 'lastName'].includes(column.key)) {
                                       return normalizeText(value, 'name') || '—'
                                     }
