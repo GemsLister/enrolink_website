@@ -539,10 +539,16 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     }
     if (key === 'actions') return null
     if (key === 'number') {
+      const nums = Array.from(new Set((filteredRows || rows || [])
+        .map((r) => Number(r?.number))
+        .filter((n) => Number.isFinite(n))
+      )).sort((a, b) => a - b)
+      const numberOptions = nums.map((n) => ({ value: `eq:${n}`, label: String(n) }))
       return [
         { value: 'asc', label: 'Ascending' },
         { value: 'desc', label: 'Descending' },
         { value: 'waitlist', label: 'WAITLIST' },
+        ...numberOptions,
       ]
     }
     if (key === 'course') {
@@ -641,7 +647,22 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           const bVal = bRow[key]
           let comparison = 0
           
-          if (key === 'number' && direction === 'waitlist') {
+          if (key === 'number' && typeof direction === 'string' && direction.startsWith('eq:')) {
+            const target = Number(direction.slice(3))
+            const aNum = Number(aVal)
+            const bNum = Number(bVal)
+            const aMatch = Number.isFinite(aNum) && aNum === target
+            const bMatch = Number.isFinite(bNum) && bNum === target
+            if (aMatch !== bMatch) {
+              comparison = aMatch ? -1 : 1
+            } else if (aMatch && bMatch) {
+              comparison = 0
+            } else {
+              // fallback: keep existing ordering or group non-matches by asc number
+              if (Number.isFinite(aNum) && Number.isFinite(bNum)) comparison = aNum - bNum
+              else comparison = compareString(String(aVal ?? ''), String(bVal ?? ''))
+            }
+          } else if (key === 'number' && direction === 'waitlist') {
             const aIs = String(aVal || '').toUpperCase() === 'WAITLIST'
             const bIs = String(bVal || '').toUpperCase() === 'WAITLIST'
             if (aIs !== bIs) {

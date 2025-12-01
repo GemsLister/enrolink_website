@@ -30,6 +30,7 @@ export default function BatchDetailsModal({
   const [localInterviewer, setLocalInterviewer] = useState(selectedBatch?.interviewer || '')
   const [editInterviewer, setEditInterviewer] = useState(selectedBatch?.interviewer || '')
   const [editStatus, setEditStatus] = useState(selectedBatch?.status || 'ONGOING')
+  const [membersQuery, setMembersQuery] = useState('')
 
   useEffect(() => {
     let active = true
@@ -77,6 +78,23 @@ export default function BatchDetailsModal({
       closeModal()
     } catch (_) { }
   }
+  const filteredMembers = useMemo(() => {
+    const q = String(membersQuery || '').trim().toLowerCase()
+    if (!q) return members
+    return members.filter((m) => {
+      const first = String(m.firstName || '').trim().toLowerCase()
+      const last = String(m.lastName || '').trim().toLowerCase()
+      const email = String(m.email || '').trim().toLowerCase()
+      const combos = [
+        first,
+        last,
+        `${last}, ${first}`,
+        `${first} ${last}`,
+        email,
+      ].filter(Boolean)
+      return combos.some((c) => c.includes(q))
+    })
+  }, [members, membersQuery])
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-[32px] shadow-[0_12px_24px_rgba(139,23,47,0.08)] w-full max-w-xl p-8 mx-auto max-h-[85vh] overflow-hidden relative border border-[#efccd2]">
@@ -124,21 +142,49 @@ export default function BatchDetailsModal({
               <button onClick={() => setShowAdd(v => !v)} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{showAdd ? 'Cancel' : 'Add Student'}</button>
             </div> */}
             {showMembers && (
-              <div className="mt-3 bg-white rounded-[24px] border border-[#f3d5d5] max-h-[50vh] overflow-auto no-scrollbar">
+              <div className="mt-3 rounded-[32px] border border-[#f7d6d6] overflow-auto no-scrollbar">
+                <div className="flex items-center justify-between gap-4 p-4">
+                  <div className="w-full max-w-sm">
+                    <input
+                      type="text"
+                      value={membersQuery}
+                      onChange={(e) => setMembersQuery(e.target.value)}
+                      placeholder="Search name or email"
+                      className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdd(v => !v)}
+                      className="rounded-full bg-[#c4375b] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 hover:bg-[#a62a49]"
+                    >
+                      {showAdd ? 'Cancel' : 'Add Student'}
+                    </button>
+                  </div>
+                </div>
                 {membersLoading ? (
                   <div className="p-4 text-sm text-gray-600">Loading members…</div>
                 ) : members.length === 0 ? (
                   <div className="p-4 text-sm text-gray-600">No members in this batch.</div>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-[#f9c4c4] text-[#5b1a30] sticky top-0"><tr><th className="text-left px-4 py-3 text-[12px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-open-sans)' }}>Name</th><th className="text-left px-4 py-3 text-[12px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-open-sans)' }}>Status</th><th className="text-left px-4 py-3 text-[12px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-open-sans)' }}>Email</th><th className="text-left px-4 py-3 text-[12px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-open-sans)' }}>Interview Date</th><th className="text-left px-4 py-3 text-[12px] tracking-[0.2em]" style={{ fontFamily: 'var(--font-open-sans)' }}>Exam Score</th></tr></thead>
+                  <table className="min-w-[1000px] border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase sticky top-0 z-10">
+                        <th className="text-left px-4 py-3">Name</th>
+                        <th className="text-left px-4 py-3">Status</th>
+                        <th className="text-left px-4 py-3">Email</th>
+                        <th className="text-left px-4 py-3">Interview Date</th>
+                        <th className="text-left px-4 py-3">Exam Score</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {members.map(m => {
+                      {filteredMembers.map(m => {
                         const n1 = `${m.firstName} ${m.lastName}`.trim().toLowerCase()
                         const n2 = `${m.lastName} ${m.firstName}`.trim().toLowerCase()
                         const score = scoresMap.get(n1) ?? scoresMap.get(n2)
                         return (
-                          <tr key={m.id} className="border-t border-[#f3d5d5]">
+                          <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fafafa]">
                             <td className="px-4 py-2 text-gray-800">{`${m.lastName}, ${m.firstName}`}</td>
                             <td className="px-4 py-2"><span className={getStatusBadge(m.status)}>{m.status}</span></td>
                             <td className="px-4 py-2 text-gray-600">{m.email}</td>

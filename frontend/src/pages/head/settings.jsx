@@ -88,75 +88,79 @@ export default function Settings() {
   if (!user || user.role !== 'DEPT_HEAD') return <Navigate to="/" replace />
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-white">
       <Sidebar />
-      <main className="flex-1 bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 overflow-y-auto">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">SETTINGS</h1>
-            <p className="text-lg text-[#2f2b33] mt-3">Manage your account and preferences</p>
+      <main className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-y-auto">
+        <div className="min-h-0 flex flex-col px-10 pt-10 pb-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+              <h1 className="text-4xl font-semibold text-[#5b1a30]">Settings</h1>
+              <p className="text-base text-[#8b4a5d]">Manage your account and preferences</p>
+            </div>
           </div>
-          {/* <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 mt-[-30px] border-2 border-[#6b2b2b]">
-            <button onClick={exportData} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 font-medium text-sm">Export My Data</button>
-          </div> */}
-        </div>
 
-        {err && <div className="text-sm text-red-600 mb-2">{err}</div>}
-        {msg && <div className="text-sm text-green-700 mb-2">{msg}</div>}
+          {err && <div className="rounded-2xl px-5 py-3 text-sm font-medium bg-[#F7D9D9] text-red-700">{err}</div>}
+          {msg && <div className="rounded-2xl px-5 py-3 text-sm font-medium bg-emerald-100 text-emerald-700">{msg}</div>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Personal Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm text-gray-700">Last Name</label>
-                <input value={profile.lastName} onChange={(e)=>setProfile(p=>({...p,lastName:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Personal Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm text-[#5b1a30]">Last Name</label>
+                  <input value={profile.lastName} onChange={(e)=>setProfile(p=>({...p,lastName:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm text-[#5b1a30]">First Name</label>
+                  <input value={profile.firstName} onChange={(e)=>setProfile(p=>({...p,firstName:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+                </div>
               </div>
               <div className="space-y-1">
-                <label className="text-sm text-gray-700">First Name</label>
-                <input value={profile.firstName} onChange={(e)=>setProfile(p=>({...p,firstName:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+                <label className="text-sm text-[#5b1a30]">Email Address</label>
+                <input value={profile.email} readOnly className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full opacity-60" />
               </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Email Address</label>
-              <input value={profile.email} readOnly className="bg-gray-50 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Department</label>
-              <input value={profile.department} onChange={(e)=>setProfile(p=>({...p,department:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Phone Number</label>
-              <input value={profile.phone} onChange={(e)=>setProfile(p=>({...p,phone:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <button onClick={saveProfile} disabled={savingProfile} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{savingProfile?'Saving…':'Update Personal Information'}</button>
-          </section>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Department</label>
+                <input value={profile.department} onChange={(e)=>setProfile(p=>({...p,department:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Phone Number</label>
+                <input value={profile.phone} onChange={(e)=>setProfile(p=>({...p,phone:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="flex justify-end">
+                <button onClick={saveProfile} disabled={savingProfile} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{savingProfile?'Saving…':'Update Personal Information'}</button>
+              </div>
+            </section>
 
-          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Notification Preferences</h2>
-            <Toggle label="Email Notifications" checked={prefs.notifEmail} onChange={v=>setPrefs(p=>({...p,notifEmail:v}))} />
-            <Toggle label="SMS Notifications" checked={prefs.notifSms} onChange={v=>setPrefs(p=>({...p,notifSms:v}))} />
-            <Toggle label="Interview Updates" checked={prefs.notifInterview} onChange={v=>setPrefs(p=>({...p,notifInterview:v}))} />
-            <Toggle label="System Alerts" checked={prefs.notifSystem} onChange={v=>setPrefs(p=>({...p,notifSystem:v}))} />
-            <button onClick={savePrefs} disabled={savingPrefs} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{savingPrefs?'Saving…':'Save Notification Preferences'}</button>
-          </section>
-        </div>
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Notification Preferences</h2>
+              <Toggle label="Email Notifications" checked={prefs.notifEmail} onChange={v=>setPrefs(p=>({...p,notifEmail:v}))} />
+              <Toggle label="SMS Notifications" checked={prefs.notifSms} onChange={v=>setPrefs(p=>({...p,notifSms:v}))} />
+              <Toggle label="Interview Updates" checked={prefs.notifInterview} onChange={v=>setPrefs(p=>({...p,notifInterview:v}))} />
+              <Toggle label="System Alerts" checked={prefs.notifSystem} onChange={v=>setPrefs(p=>({...p,notifSystem:v}))} />
+              <div className="flex justify-end">
+                <button onClick={savePrefs} disabled={savingPrefs} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{savingPrefs?'Saving…':'Save Notification Preferences'}</button>
+              </div>
+            </section>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <section className="bg-white rounded-3xl border border-[#efccd2] p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Security Settings</h2>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Current Password</label>
-              <input type="password" value={pw.currentPassword} onChange={(e)=>setPw(p=>({...p,currentPassword:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">New Password</label>
-              <input type="password" value={pw.newPassword} onChange={(e)=>setPw(p=>({...p,newPassword:e.target.value}))} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-            </div>
-            <button onClick={changePassword} disabled={changingPw || !pw.currentPassword || !pw.newPassword} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{changingPw?'Updating…':'Update Password'}</button>
-          </section>
-
-          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Security Settings</h2>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Current Password</label>
+                <input type="password" value={pw.currentPassword} onChange={(e)=>setPw(p=>({...p,currentPassword:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">New Password</label>
+                <input type="password" value={pw.newPassword} onChange={(e)=>setPw(p=>({...p,newPassword:e.target.value}))} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full" />
+              </div>
+              <div className="flex justify-end">
+                <button onClick={changePassword} disabled={changingPw || !pw.currentPassword || !pw.newPassword} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{changingPw?'Updating…':'Update Password'}</button>
+              </div>
+            </section>
+          </div>
         </div>
       </main>
     </div>
@@ -165,9 +169,9 @@ export default function Settings() {
 
 function Toggle({ label, checked, onChange }) {
   return (
-    <label className="flex items-center justify-between border rounded-2xl px-3 py-2 border-[#cfa3ad]">
-      <span className="text-sm text-[#7d102a]">{label}</span>
-      <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked?'bg-[#6b0000]':'bg-gray-300'}`}>
+    <label className="flex items-center justify-between rounded-2xl px-4 py-3 border border-rose-200">
+      <span className="text-sm font-medium text-[#5b1a30]">{label}</span>
+      <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked?'bg-[#c4375b]':'bg-gray-300'}`}>
         <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${checked?'translate-x-5':'translate-x-1'}`} />
       </button>
     </label>
