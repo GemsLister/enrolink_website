@@ -3,6 +3,9 @@ import mongoose from 'mongoose';
 export let officersConn = null;
 export let recordsConn = null;
 export let archivesConn = null;
+export function getHeadConn() {
+  return mongoose.connection;
+}
 export function getOfficersConn() {
   if (!officersConn) throw new Error('Officers DB not connected');
   return officersConn;

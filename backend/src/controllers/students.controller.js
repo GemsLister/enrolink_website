@@ -25,6 +25,18 @@ export async function list(req, res, next) {
     } else {
       q.archived_at = { $ne: null };
     }
+    // RBAC: Officers without viewRecordsAllPrograms can only view their assigned scope
+    if (req.user && req.user.role === 'OFFICER') {
+      try {
+        const { getOfficerUserModel } = await import('../models/User.js');
+        const User = getOfficerUserModel();
+        const officer = await User.findById(req.user.id).lean();
+        const canViewAll = !!(officer && officer.permissions && officer.permissions.viewRecordsAllPrograms);
+        if (!canViewAll) {
+          if (officer?.assignedYear) q.batch = officer.assignedYear;
+        }
+      } catch (_) {}
+    }
     const rows = await Model.find(q).lean();
     res.json({ rows });
   } catch (e) { 
@@ -45,6 +57,20 @@ export async function upsert(req, res, next) {
     if (nameSignature) data.nameSignature = nameSignature;
 
     const isArchiving = !!data.archived_at && String(data.archived_at).length > 0;
+
+    // RBAC: Officers require processEnrollment when changing enrollmentStatus or setting status to ENROLLED
+    if (req.user && req.user.role === 'OFFICER') {
+      try {
+        const { getOfficerUserModel } = await import('../models/User.js');
+        const User = getOfficerUserModel();
+        const officer = await User.findById(req.user.id).lean();
+        const perms = officer?.permissions || {};
+        const wantsEnroll = ['ENROLLED'].includes(String(data.status || '').toUpperCase()) || ['ENROLLED'].includes(String(data.enrollmentStatus || '').toUpperCase());
+        if (wantsEnroll && !perms.processEnrollment) {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+      } catch (_) {}
+    }
     const Live = getRecordModel(kind, false);
     const Arch = getRecordModel(kind, true);
 

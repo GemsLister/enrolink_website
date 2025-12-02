@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { getOfficersConn } from '../config/db.js';
+import { getHeadConn } from '../config/db.js';
 
 const BatchSchema = new mongoose.Schema(
   {
@@ -18,8 +18,8 @@ const BatchSchema = new mongoose.Schema(
 let _model;
 export function getBatchModel() {
   if (!_model) {
-    const conn = getOfficersConn();
-    _model = conn.model('Batch', BatchSchema);
+    const conn = getHeadConn();
+    _model = conn.model('Batch', BatchSchema, 'batches');
   }
   return _model;
 }

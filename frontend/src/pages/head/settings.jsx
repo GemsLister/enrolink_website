@@ -15,6 +15,9 @@ export default function Settings() {
   const [changingPw, setChangingPw] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
+  const [officers, setOfficers] = useState([])
+  const [selectedOfficerId, setSelectedOfficerId] = useState('')
+  const [perms, setPerms] = useState({ validateRequirements: false, editProfiles: false, processEnrollment: false, manageSchedule: false, generateReports: false, viewRecordsAllPrograms: false })
 
   useEffect(() => {
     let mounted = true
@@ -37,6 +40,42 @@ export default function Settings() {
     return () => { mounted = false }
   }, [api, token])
 
+  useEffect(() => {
+    let active = true
+    async function loadOfficers() {
+      try {
+        const res = await api.get('/officers')
+        if (active) setOfficers(res.rows || [])
+      } catch (_) { if (active) setOfficers([]) }
+    }
+    if (token) loadOfficers()
+    return () => { active = false }
+  }, [api, token])
+
+  function selectOfficer(id) {
+    setSelectedOfficerId(id)
+    const o = officers.find(x => String(x._id || x.id) === String(id))
+    const p = (o && o.permissions) || {}
+    setPerms({
+      validateRequirements: !!p.validateRequirements,
+      editProfiles: !!p.editProfiles,
+      processEnrollment: !!p.processEnrollment,
+      manageSchedule: !!p.manageSchedule,
+      generateReports: !!p.generateReports,
+      viewRecordsAllPrograms: !!p.viewRecordsAllPrograms,
+    })
+  }
+
+  async function saveOfficerPerms() {
+    if (!selectedOfficerId) return
+    try {
+      setErr(''); setMsg('')
+      const res = await api.patch(`/officers/${encodeURIComponent(selectedOfficerId)}`, { permissions: perms })
+      setMsg('Permissions updated')
+      setOfficers(prev => prev.map(o => String(o._id || o.id) === String(selectedOfficerId) ? { ...o, permissions: res.doc?.permissions || perms } : o))
+    } catch (e) { setErr(e.message) }
+  }
+
   async function saveProfile() {
     try {
       setSavingProfile(true); setErr(''); setMsg('')
@@ -47,6 +86,7 @@ export default function Settings() {
       const firstName = parts[0] || ''
       const lastName = parts.slice(1).join(' ') || ''
       setProfile(p => ({ ...p, name: nm, firstName, lastName, department: res.user?.department || p.department, phone: res.user?.phone || p.phone }))
+      try { localStorage.setItem('userProfile', JSON.stringify(res.user || { name: nm, email: profile.email, department: res.user?.department || p.department, phone: res.user?.phone || p.phone, role: 'DEPT_HEAD' })) } catch (_) {}
       setMsg('Personal information updated')
     } catch (e) { setErr(e.message) } finally { setSavingProfile(false) }
   }
@@ -140,6 +180,43 @@ export default function Settings() {
               <Toggle label="System Alerts" checked={prefs.notifSystem} onChange={v=>setPrefs(p=>({...p,notifSystem:v}))} />
               <div className="flex justify-end">
                 <button onClick={savePrefs} disabled={savingPrefs} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">{savingPrefs?'Saving…':'Save Notification Preferences'}</button>
+              </div>
+            </section>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
+              <h2 className="text-sm font-bold text-[#7d102a]">Assign Roles and Permissions</h2>
+              <div className="space-y-1">
+                <label className="text-sm text-[#5b1a30]">Select Officer</label>
+                <select value={selectedOfficerId} onChange={(e)=>selectOfficer(e.target.value)} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full">
+                  <option value="">Choose an officer…</option>
+                  {officers.map(o => (
+                    <option key={String(o._id || o.id)} value={String(o._id || o.id)}>{o.name || o.email}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedOfficerId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    { key: 'validateRequirements', label: 'Validate requirements' },
+                    { key: 'editProfiles', label: 'Encode/update profiles' },
+                    { key: 'processEnrollment', label: 'Process enrollment (approve/return/hold)' },
+                    { key: 'manageSchedule', label: 'Manage schedule and subjects' },
+                    { key: 'generateReports', label: 'Generate enrollment reports' },
+                    { key: 'viewRecordsAllPrograms', label: 'View records across programs' },
+                  ].map(item => (
+                    <label key={item.key} className="flex items-center justify-between rounded-2xl px-4 py-3 border border-rose-200">
+                      <span className="text-sm font-medium text-[#5b1a30]">{item.label}</span>
+                      <button type="button" onClick={()=>setPerms(p=>({ ...p, [item.key]: !p[item.key] }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${perms[item.key]?'bg-[#c4375b]':'bg-gray-300'}`}>
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${perms[item.key]?'translate-x-5':'translate-x-1'}`} />
+                      </button>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button onClick={saveOfficerPerms} disabled={!selectedOfficerId} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">Save Permissions</button>
               </div>
             </section>
           </div>

@@ -55,7 +55,7 @@ export function getRecordModel(kind = 'students', archived = false) {
   const normalizedKind = String(kind || '').toLowerCase()
   const collection = archived
     ? (normalizedKind === 'applicants' ? 'applicant_archives'
-      : normalizedKind === 'enrollees' ? 'enrollees_archives'
+      : normalizedKind === 'enrollees' ? 'enrollee_archives'
       : 'student_archives')
     : (normalizedKind === 'applicants' ? 'applicants'
       : normalizedKind === 'enrollees' ? 'enrollees'

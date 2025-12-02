@@ -1,7 +1,7 @@
 // In backend/src/routes/calendar.routes.js
 import { Router } from 'express';
 import * as ctrl from '../controllers/calendar.controller.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireOfficerPermission } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -24,9 +24,9 @@ router.get('/test', (req, res) => {
 
 // These routes will be prefixed with /api/calendar
 router.get('/events', auth, ctrl.list);
-router.post('/events', auth, ctrl.create);
-router.patch('/events/:id', auth, ctrl.update);
-router.delete('/events/:id', auth, ctrl.remove);
+router.post('/events', auth, requireOfficerPermission('manageSchedule'), ctrl.create);
+router.patch('/events/:id', auth, requireOfficerPermission('manageSchedule'), ctrl.update);
+router.delete('/events/:id', auth, requireOfficerPermission('manageSchedule'), ctrl.remove);
 router.post('/sync', auth, ctrl.syncCalendar); // Sync FROM Google Calendar to database
 router.post('/push', auth, ctrl.pushToGoogleCalendar); // Push database events TO Google Calendar
 router.delete('/prune', auth, ctrl.pruneGoogleToDatabase); // Delete Google events not in DB for user

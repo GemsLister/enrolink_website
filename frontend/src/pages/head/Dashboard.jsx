@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/client";
@@ -11,7 +11,6 @@ import RecentEditedIcon from "../../assets/recent-activty-edited.png";
 import RecentArchiveIcon from "../../assets/recent-activity-icon-archive.png";
 import ApplicantsIcon from "../../assets/applicants.png";
 import InterviewedIcon from "../../assets/interviewed.png";
-import PassedIcon from "../../assets/passed-interviewe.png";
 import EnrolledIcon from "../../assets/enrolled.png";
 import ScheduleIcon from "../../assets/Union.png";
 
@@ -71,6 +70,7 @@ function timeAgo(input) {
 
 export default function Dashboard() {
   const { isAuthenticated, user, token } = useAuth();
+  const navigate = useNavigate();
   const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'primary';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -471,7 +471,6 @@ export default function Dashboard() {
   const summaryCards = [
     { key: 'applicants', label: "Total Applicant", value: totals.totalApplicants },
     { key: 'interviewed', label: "Interviewed", value: totals.interviewed },
-    { key: 'passed', label: "Passed Interview", value: totals.passedInterview },
     { key: 'enrolled_bsit', label: "Enrolled BSIT", value: bsitEnrolledCount },
     { key: 'enrolled_bsemc', label: "Enrolled BSEMC", value: bsemcEnrolledCount },
     { key: 'enrolled_all', label: "Enrolled All Students", value: (bsitEnrolledCount + bsemcEnrolledCount) },
@@ -501,9 +500,9 @@ export default function Dashboard() {
       </aside>
 
       {/* Main + Right column */}
-      <div className="flex-1 grid grid-cols-[1fr_360px]">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* Main content */}
-        <main className="bg-[#f7f1f2] px-10 py-8">
+        <main className="bg-[#f7f1f2] px-4 sm:px-10 py-6 sm:py-8 min-h-[100dvh] overflow-y-auto">
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
           <div className="mt-4 flex gap-2">
             <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
@@ -552,53 +551,33 @@ export default function Dashboard() {
             </label>
           </p>
 
-          {/* Summary cards (non-enrolled) */}
-          <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {summaryCards.filter((card) => !String(card.key || '').startsWith('enrolled_')).map((card) => (
+          <div className="mt-6 grid grid-flow-col auto-cols-max gap-4 overflow-x-auto">
+            {summaryCards.map((card) => (
               <div
                 key={card.key}
-                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40"
+                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40 min-w-[220px] cursor-pointer hover:bg-[#fff0f3]"
+                onClick={() => {
+                  const k = String(card.key || "");
+                  const to = k === "applicants"
+                    ? "/head/records/applicants"
+                    : k === "interviewed"
+                    ? "/head/records/enrollees"
+                    : k.startsWith("enrolled_")
+                    ? "/head/records/students"
+                    : null;
+                  if (to) navigate(to);
+                }}
               >
                 <div className="flex items-center justify-center rounded-full w-11 h-11 bg-[#f2c6cf]">
                   {(() => {
                     const iconMap = {
                       applicants: ApplicantsIcon,
                       interviewed: InterviewedIcon,
-                      passed: PassedIcon,
-                    };
-                    const src = iconMap[card.key] || ApplicantsIcon;
-                    return <img src={src} alt="" className="w-6 h-6" />;
-                  })()}
-                </div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-[#a86a74] leading-4 text-center break-words whitespace-normal max-w-[8rem]">
-                  {card.label}
-                </div>
-                {loading ? (
-                  <div className="h-3 w-10 rounded bg-[#f3d9de] animate-pulse" />
-                ) : (
-                  <span className="text-2xl font-extrabold text-[#7d102a]">
-                    {Number.isFinite(card.value) ? card.value : 0}
-                  </span>
-                )}
-              </div>
-            ))}
-          </section>
-
-          {/* Enrolled cards in one line */}
-          <div className="mt-4 grid grid-flow-col auto-cols-max gap-4 overflow-x-auto">
-            {summaryCards.filter((card) => String(card.key || '').startsWith('enrolled_')).map((card) => (
-              <div
-                key={card.key}
-                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40 min-w-[220px]"
-              >
-                <div className="flex items-center justify-center rounded-full w-11 h-11 bg-[#f2c6cf]">
-                  {(() => {
-                    const iconMap = {
                       enrolled_bsit: EnrolledIcon,
                       enrolled_bsemc: EnrolledIcon,
                       enrolled_all: EnrolledIcon,
                     };
-                    const src = iconMap[card.key] || EnrolledIcon;
+                    const src = iconMap[card.key] || ApplicantsIcon;
                     return <img src={src} alt="" className="w-6 h-6" />;
                   })()}
                 </div>
@@ -639,7 +618,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: 360, height: 360 }}
+                      style={{ width: '100%', height: 360 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -701,7 +680,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: 360, height: 360 }}
+                      style={{ width: '100%', height: 360 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -763,7 +742,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: 360, height: 360 }}
+                      style={{ width: '100%', height: 360 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
