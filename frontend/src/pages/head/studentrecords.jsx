@@ -1568,15 +1568,21 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                   )}
                                 </div>
                               ) : column.key === 'recordCategory' ? (
-                                <select
-                                  value={value || currentCategory}
-                                  onChange={(event) => handleInlineStatusChange(row, event.target.value)}
-                                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                                >
-                                  {CATEGORY_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
+                                isArchiveView || row.archived_at ? (
+                                  <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                                    {value || currentCategory}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={value || currentCategory}
+                                    onChange={(event) => handleInlineStatusChange(row, event.target.value)}
+                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                  >
+                                    {CATEGORY_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
+                                  </select>
+                                )
                               ) : (
                                 <span>
                                   {(() => {
