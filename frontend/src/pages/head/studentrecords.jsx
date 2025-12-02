@@ -519,7 +519,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       const url = `/students${queryString ? `?${queryString}` : ''}`
       const res = await api.get(url)
       const docs = Array.isArray(res?.rows) ? res.rows : []
-      setRows(docs)
+      // Show newest rows first by default; assume API returns insertion-ordered
+      setRows(docs.slice().reverse())
       rowsRef.current = docs
     } catch (error) {
       console.error('Error fetching records:', error)
