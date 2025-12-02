@@ -133,14 +133,16 @@ export default function OfficerDashboard() {
     async function loadCalendar() {
       if (!token) return
       const now = new Date()
-      const timeMin = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
-      const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      const startOfToday = new Date(now)
+      startOfToday.setHours(0, 0, 0, 0)
+      const timeMin = startOfToday.toISOString()
+      const timeMax = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
       try {
         const data = await api.calendarEvents(token, { timeMin, timeMax })
         if (!alive) return
         const items = Array.isArray(data?.events) ? data.events : []
         items.sort((a, b) => new Date(a.start?.dateTime || a.start?.date || 0) - new Date(b.start?.dateTime || b.start?.date || 0))
-        setGcal(items.slice(0, 10))
+        setGcal(items)
       } catch (_) {
         if (!alive) return
         setGcal([])
@@ -421,13 +423,15 @@ export default function OfficerDashboard() {
   async function refreshCalendar() {
     if (!token) return
     const now = new Date()
-    const timeMin = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
-    const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const startOfToday = new Date(now)
+    startOfToday.setHours(0, 0, 0, 0)
+    const timeMin = startOfToday.toISOString()
+    const timeMax = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
     try {
       const data = await api.calendarEvents(token, { timeMin, timeMax })
       const items = Array.isArray(data?.events) ? data.events : []
       items.sort((a, b) => new Date(a.start?.dateTime || a.start?.date || 0) - new Date(b.start?.dateTime || b.start?.date || 0))
-      setGcal(items.slice(0, 10))
+      setGcal(items)
     } catch (_) {
       setGcal([])
     }
@@ -436,8 +440,8 @@ export default function OfficerDashboard() {
 
 
   async function deleteSelectedSchedules() {
-    if (!token || !selectedScheduleIds.length) return
-    openArchiveConfirm(selectedScheduleIds)
+    if (!token || selectedScheduleIds.size === 0) return
+    openArchiveConfirm(Array.from(selectedScheduleIds))
   }
 
   const openArchiveConfirm = (ids) => {
@@ -527,7 +531,7 @@ export default function OfficerDashboard() {
               </select>
             </label>
           </p>
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && (<>
           <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {summaryCards.map((card, idx) => (
               <div key={card.label} className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40">
@@ -537,52 +541,222 @@ export default function OfficerDashboard() {
               </div>
             ))}
           </section>
-          <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Batch Analytics</h2>
-              {(() => {
-                const rows = (batches && batches.length ? batches : FALLBACK_BATCHES).map((b) => [String(b.code || b.label || '—'), Number(b.count ?? b.value ?? 0)])
-                const data = [["Batch", "Count"], ...rows]
-                return (
-                  <QuickChart
-                    type="BarChart"
-                    className="mt-4"
-                    style={{ width: '70%', height: 360 }}
-                    data={data}
-                    options={{
-                      backgroundColor: 'transparent',
-                      legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                      slices: { 0: { color: '#7d102a' } },
-                    }}
-                    engine="quickchart"
-                  />
-                )
-              })()}
-            </div>
-            <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-              <h2 className="text-sm font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
-              <QuickChart
-                type="PieChart"
-                className="mt-4"
-                style={{ width: '70%', height: 360 }}
-                data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
-                options={{
-                  backgroundColor: 'transparent',
-                  legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
-                  slices: { 0: { color: '#7d102a' }, 1: { color: '#f4c3ce' } },
-                }}
-                engine="quickchart"
-              />
-            </div>
-          </section>
-          {/* Google Calendar UI */}
           <section className="mt-6">
             <CalendarGrid key={calendarRefreshKey} />
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
+            </div>
           </section>
-          {/* Add schedule CTA */}
-          <div className="mt-4 flex justify-end">
-            <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
-          </div>
+          <section className="mt-6 grid grid-cols-2 gap-8">
+            {(courseFilter === 'IT') && (
+              <>
+                <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <div>
+                    <QuickChart
+                      type="PieChart"
+                      className=""
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#f4c3ce' }, 1: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSIT</h2>
+                  {itPassersStrandData && itPassersStrandData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] col-span-2">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+                  {itConfirmedData && itConfirmedData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '70%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+              </>
+            )}
+            {(courseFilter === 'EMC') && (
+              <>
+                <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <div>
+                    <QuickChart
+                      type="PieChart"
+                      className=""
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#f4c3ce' }, 1: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSEMC</h2>
+                  {emcPassersStrandData && emcPassersStrandData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcPassersByStrand' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] col-span-2">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
+                  {emcConfirmedData && emcConfirmedData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '70%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcConfirmedByPercentile' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+              </>
+            )}
+            {(courseFilter === 'ALL') && (
+              <>
+                <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <div>
+                    <QuickChart
+                      type="PieChart"
+                      className=""
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#f4c3ce' }, 1: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSIT</h2>
+                  {itPassersStrandData && itPassersStrandData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSEMC</h2>
+                  {emcPassersStrandData && emcPassersStrandData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '100%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcPassersByStrand' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+                <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] col-span-2">
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+                  {itConfirmedData && itConfirmedData.length ? (
+                    <QuickChart
+                      type="BarChart"
+                      className="mt-4"
+                      style={{ width: '70%', height: 360 }}
+                      dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
+                      token={token}
+                      options={{
+                        backgroundColor: 'transparent',
+                        legend: { position: 'bottom', textStyle: { color: '#7d102a' } },
+                        slices: { 0: { color: '#7d102a' } },
+                      }}
+                      engine="quickchart"
+                    />
+                  ) : (
+                    <div className="text-sm text-[#a86a74] mt-4">No data.</div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+          </>)}
+          
           {error && (<div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">{error}</div>)}
           {showScheduleModal && (
             <ScheduleCreateModal
@@ -590,7 +764,6 @@ export default function OfficerDashboard() {
               onClose={() => setShowScheduleModal(false)}
               onCreated={refreshCalendar}
             />
-          )}
           )}
           {activeTab === 'leaderboards' && (
             <section className="mt-6 grid grid-cols-1 gap-6">
