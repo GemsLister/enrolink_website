@@ -8,7 +8,7 @@ export default function Settings() {
   const { isAuthenticated, user, token } = useAuth()
   const api = useApi(token)
   const [profile, setProfile] = useState({ name: '', firstName: '', lastName: '', email: '', department: '', phone: '' })
-  const [prefs, setPrefs] = useState({ notifEmail: true, notifSms: false, notifInterview: true, notifSystem: true })
+  const [prefs, setPrefs] = useState({ notifEmail: true, notifInterview: true, notifSystem: true })
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' })
@@ -29,7 +29,7 @@ export default function Settings() {
           const firstName = parts[0] || ''
           const lastName = parts.slice(1).join(' ') || ''
           setProfile({ name: nm, firstName, lastName, email: u.email || '', department: u.department || '', phone: u.phone || '' })
-          setPrefs({ notifEmail: !!u.notifEmail, notifSms: !!u.notifSms, notifInterview: !!u.notifInterview, notifSystem: !!u.notifSystem })
+          setPrefs({ notifEmail: !!u.notifEmail, notifInterview: !!u.notifInterview, notifSystem: !!u.notifSystem })
         }
       } catch (e) { if (mounted) setErr(e.message) }
     }
@@ -54,7 +54,7 @@ export default function Settings() {
   async function savePrefs() {
     try {
       setSavingPrefs(true); setErr(''); setMsg('')
-      await api.put('/auth/me', prefs)
+      await api.put('/auth/me', { notifEmail: prefs.notifEmail, notifInterview: prefs.notifInterview, notifSystem: prefs.notifSystem })
       setMsg('Notification preferences saved')
     } catch (e) { setErr(e.message) } finally { setSavingPrefs(false) }
   }
@@ -136,7 +136,6 @@ export default function Settings() {
             <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
               <h2 className="text-sm font-bold text-[#7d102a]">Notification Preferences</h2>
               <Toggle label="Email Notifications" checked={prefs.notifEmail} onChange={v=>setPrefs(p=>({...p,notifEmail:v}))} />
-              <Toggle label="SMS Notifications" checked={prefs.notifSms} onChange={v=>setPrefs(p=>({...p,notifSms:v}))} />
               <Toggle label="Interview Updates" checked={prefs.notifInterview} onChange={v=>setPrefs(p=>({...p,notifInterview:v}))} />
               <Toggle label="System Alerts" checked={prefs.notifSystem} onChange={v=>setPrefs(p=>({...p,notifSystem:v}))} />
               <div className="flex justify-end">
