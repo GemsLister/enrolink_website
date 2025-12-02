@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
 import { api as clientApi } from '../../api/client'
 import UserChip from '../../components/UserChip'
+import enrolinkLogo from '../../assets/enrolink-logo 2.png'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
@@ -1080,70 +1081,101 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const triggerImport = () => fileInputRef.current?.click()
 
   const handleExportPdf = async () => {
-    const selectedKeys = exportSelected.length ? exportSelected : exportableColumns.map((c) => c.key)
-    const selectedCols = exportableColumns.filter((c) => selectedKeys.includes(c.key))
-    const data = exportScope === 'selected'
-      ? sortedRows.filter((r) => selectedRows.includes(getRowId(r)))
-      : (exportScope === 'filtered' ? sortedRows : applySort(rows))
-    const findLabel = (key) => (columns.find((c) => c.key === key)?.label || key)
-    const formatCell = (key, val) => {
-      if (['firstName', 'middleName', 'lastName'].includes(key)) return normalizeText(val, 'name') || ''
-      if (isStudentView && key === 'interviewDate') return normalizeDate(val, 'short') || ''
-      if (PERCENTAGE_COLUMN_KEYS.has(key) || key === 'pScore') return formatPercent(val)
-      return String(val ?? '')
-    }
+    try {
+      const selectedKeys = exportSelected.length ? exportSelected : exportableColumns.map((c) => c.key)
+      const selectedCols = exportableColumns.filter((c) => selectedKeys.includes(c.key))
+      const data = exportScope === 'selected'
+        ? sortedRows.filter((r) => selectedRows.includes(getRowId(r)))
+        : (exportScope === 'filtered' ? sortedRows : applySort(rows))
+      const findLabel = (key) => (columns.find((c) => c.key === key)?.label || key)
+      const formatCell = (key, val) => {
+        if (['firstName', 'middleName', 'lastName'].includes(key)) return normalizeText(val, 'name') || ''
+        if (isStudentView && key === 'interviewDate') return normalizeDate(val, 'short') || ''
+        if (PERCENTAGE_COLUMN_KEYS.has(key) || key === 'pScore') return formatPercent(val)
+        return String(val ?? '')
+      }
 
-    const [{ jsPDF }, autoTableModule] = await Promise.all([
-      import('jspdf'),
-      import('jspdf-autotable')
-    ])
+      const [{ jsPDF }, autoTableModule] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+      ])
     const autoTable = autoTableModule.default
     const formatMap = { A4: 'a4', Letter: 'letter', Legal: 'legal' }
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: formatMap[exportPaperSize] || 'a4' })
 
-    let y = 10
-    doc.setFontSize(16)
-    doc.text(headerTitle, 10, y)
-    y += 6
-    doc.setFontSize(11)
-    doc.text(headerSubtitle, 10, y)
-    y += 8
+    try {
+      const fontResp = await fetch('https://github.com/google/fonts/raw/main/ofl/nunito/Nunito-Regular.ttf')
+      if (fontResp.ok) {
+        const fontBlob = await fontResp.blob()
+        const fontBase64 = await new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.readAsDataURL(fontBlob); })
+        doc.addFileToVFS('Nunito-Regular.ttf', fontBase64)
+        doc.addFont('Nunito-Regular.ttf', 'Nunito', 'normal')
+        doc.setFont('Nunito', 'normal')
+      }
+    } catch (e) { void e }
 
-    const headAll = selectedCols.map((c) => findLabel(c.key))
-    const bodyAll = data.map((row) => selectedCols.map((c) => {
-      const key = c.key
-      if (key === 'pScore') return formatCell(key, row.percentileScore)
-      if (key === 'sScore') return formatCell(key, row.shsGpa)
-      if (key === 'qScore') return formatCell(key, computeQPercent(row))
-      if (key === 'finalScore') return formatCell(key, computeFinalPercent(row))
-      return formatCell(key, row[key])
-    }))
+      let logoData = null
+      try {
+        const resp = await fetch(enrolinkLogo)
+        const blob = await resp.blob()
+        logoData = await new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); })
+      } catch (e) { void e }
+
+      const pw = doc.internal.pageSize.getWidth()
+      const ph = doc.internal.pageSize.getHeight()
+      const ml = 10
+      const mr = 10
+      const mb = 14
+    const pillW = 60
+    const pillH = 18
+    const pillX = ml + (pw - ml - mr - pillW) / 2
+    const pillY = 12
+    const titleY = pillY + pillH + 10
+    const contentTop = titleY + 6
+
+      const headAll = selectedCols.map((c) => findLabel(c.key))
+      const bodyAll = data.map((row) => selectedCols.map((c) => {
+        const key = c.key
+        if (key === 'pScore') return formatCell(key, row.percentileScore)
+        if (key === 'sScore') return formatCell(key, row.shsGpa)
+        if (key === 'qScore') return formatCell(key, computeQPercent(row))
+        if (key === 'finalScore') return formatCell(key, computeFinalPercent(row))
+        return formatCell(key, row[key])
+      }))
+
+    const pdfTitle = isStudentView ? 'Student Records' : (isEnrolleeView ? 'Enrollee Records' : 'Applicant Records')
 
     autoTable(doc, {
       head: [headAll],
       body: bodyAll,
-      startY: y,
-      styles: { fontSize: 7, cellPadding: 1, overflow: 'linebreak', cellWidth: 'wrap' },
-      headStyles: { fillColor: [249, 196, 196], textColor: [91, 26, 48] },
+      margin: { top: contentTop + 10, left: ml + 6, right: mr + 6, bottom: mb + 12 },
+      styles: { font: 'Nunito', fontSize: 7, cellPadding: 1, overflow: 'linebreak', cellWidth: 'wrap' },
+      headStyles: { font: 'Nunito', fillColor: [249, 196, 196], textColor: [91, 26, 48] },
       alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { top: 10, left: 10, right: 10, bottom: 10 },
       tableWidth: 'auto',
       horizontalPageBreak: true,
       didDrawPage: (dataCtx) => {
-        const pageCount = typeof doc.getNumberOfPages === 'function' ? doc.getNumberOfPages() : (doc.internal.getNumberOfPages?.() || 1)
-        const pageInfo = doc.internal.getCurrentPageInfo?.()
-        const pageNumber = dataCtx.pageNumber || pageInfo?.pageNumber || 1
-        const pw = doc.internal.pageSize.getWidth()
-        const ph = doc.internal.pageSize.getHeight()
-        doc.setFontSize(9)
-        doc.text(`${pageNumber}/${pageCount}`, pw - 12, ph - 6, { align: 'right' })
+          const pageInfo = doc.internal.getCurrentPageInfo?.()
+          const pageNumber = dataCtx.pageNumber || pageInfo?.pageNumber || 1
+          doc.setFillColor(232, 201, 173)
+          doc.roundedRect(pillX, pillY, pillW, pillH, 9, 9, 'F')
+          if (logoData) { doc.addImage(logoData, 'PNG', pillX + 6, pillY + 4, pillW - 12, pillH - 8) } else { doc.setFontSize(12); doc.text('EnroLink', pillX + pillW / 2, pillY + 12, { align: 'center' }) }
+        doc.setFontSize(16)
+        doc.text(pdfTitle, pw / 2, titleY, { align: 'center' })
+        const pageId = `${new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14)}-${String(pageNumber).padStart(2,'0')}`
+        doc.setFontSize(10)
+        doc.text(`ID ${pageId}`, ml, ph - mb + 6)
+        doc.text(`Page ${pageNumber}`, pw - mr, ph - mb + 6, { align: 'right' })
       },
     })
 
-    const datasetName = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
-    const fileName = `records_${datasetName}_${new Date().toISOString().slice(0, 10)}.pdf`
-    doc.save(fileName)
-    setShowExportModal(false)
+      const datasetName = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
+      const fileName = `records_${datasetName}_${new Date().toISOString().slice(0, 10)}.pdf`
+      doc.save(fileName)
+      setShowExportModal(false)
+    } catch (error) {
+      setBanner({ type: 'error', message: error.message || 'Export failed. Please try again.' })
+    }
   }
 
   const handleArchive = async (row) => {

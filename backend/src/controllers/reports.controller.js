@@ -2,6 +2,8 @@ import { getInterviewModel } from '../models/Interview.js';
 import PDFDocument from 'pdfkit';
 import { readSheet } from '../services/google/sheets.js';
 import { getStudentModel } from '../models/Student.js';
+import fs from 'fs';
+import path from 'path';
 
 export async function list(req, res, next) {
   try {
@@ -153,42 +155,80 @@ export async function pdf(req, res, next) {
     res.setHeader('Content-Disposition', 'inline; filename="interview-report.pdf"');
     doc.pipe(res);
 
-    doc.fontSize(18).text('Interview Report', { align: 'center' });
-    if (req.query.batch) doc.moveDown(0.5).fontSize(12).text(`Batch: ${req.query.batch}`, { align: 'center' });
-    doc.moveDown();
+    let pageIndex = 0;
+    const logoCandidates = [
+      path.resolve(process.cwd(), 'frontend/src/assets/enrolink-logo 2.png'),
+      path.resolve(process.cwd(), '../frontend/src/assets/enrolink-logo 2.png'),
+    ];
+    let logoPath = '';
+    for (const p of logoCandidates) { if (!logoPath && fs.existsSync(p)) logoPath = p; }
 
-    doc.fontSize(12);
-    const pageWidth = doc.page.width;
-    const ml = doc.page.margins.left;
-    const mr = doc.page.margins.right;
-    const available = pageWidth - ml - mr;
-    const xName = ml + available * 0.00;
-    const xBatch = ml + available * 0.28;
-    const xInterviewer = ml + available * 0.44;
-    const xDate = ml + available * 0.62;
-    const xStatus = ml + available * 0.78;
-    const xScore = ml + available * 0.90;
-    const yHeader = doc.y;
-    doc.text('Student Name', xName, yHeader, { continued: true });
-    doc.text('Batch', xBatch, yHeader, { continued: true });
-    doc.text('Interviewer', xInterviewer, yHeader, { continued: true });
-    doc.text('Interview Date', xDate, yHeader, { continued: true });
-    doc.text('Status', xStatus, yHeader, { continued: true });
-    doc.text('Exam Score', xScore, yHeader);
-    doc.moveDown(0.5);
-    const yLine = doc.y;
-    doc.moveTo(ml, yLine).lineTo(pageWidth - mr, yLine).stroke();
+    const drawChrome = () => {
+      pageIndex += 1;
+      const pw = doc.page.width;
+      const ph = doc.page.height;
+      const ml = doc.page.margins.left;
+      const mr = doc.page.margins.right;
+      const mb = doc.page.margins.bottom;
+      const availableW = pw - ml - mr;
+      const pillW = 160;
+      const pillH = 42;
+      const pillX = ml + (availableW - pillW) / 2;
+      const pillY = 24;
+      doc.save();
+      doc.roundedRect(pillX, pillY, pillW, pillH, 21).fill('#e8c9ad');
+      doc.restore();
+      if (logoPath) {
+        const imgW = 120;
+        const imgH = 30;
+        const imgX = ml + (availableW - imgW) / 2;
+        const imgY = pillY + (pillH - imgH) / 2;
+        try { doc.image(logoPath, imgX, imgY, { width: imgW, height: imgH }); } catch (_) {}
+      } else {
+        doc.fontSize(14).fillColor('#3a2a22').text('enrolink logo', pillX + 20, pillY + 12);
+      }
+      doc.fillColor('#000000');
+      doc.fontSize(16).text('Records Summary', ml, pillY + pillH + 18, { width: availableW, align: 'center' });
+      const rectY = pillY + pillH + 40;
+      const rectH = ph - rectY - mb - 36;
+      doc.save();
+      doc.roundedRect(ml, rectY, availableW, rectH, 18).fill('#e8c9ad');
+      doc.restore();
+      doc.fontSize(11);
+      const xName = ml + availableW * 0.02;
+      const xBatch = ml + availableW * 0.30;
+      const xInterviewer = ml + availableW * 0.46;
+      const xDate = ml + availableW * 0.64;
+      const xStatus = ml + availableW * 0.80;
+      const xScore = ml + availableW * 0.92;
+      const yHeader = rectY + 14;
+      doc.text('Student Name', xName, yHeader, { continued: true });
+      doc.text('Batch', xBatch, yHeader, { continued: true });
+      doc.text('Interviewer', xInterviewer, yHeader, { continued: true });
+      doc.text('Interview Date', xDate, yHeader, { continued: true });
+      doc.text('Status', xStatus, yHeader, { continued: true });
+      doc.text('Exam Score', xScore, yHeader);
+      doc.moveTo(ml + 10, yHeader + 14).lineTo(ml + availableW - 10, yHeader + 14).stroke();
+      const ts = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+      const uid = `${ts}-${String(pageIndex).padStart(2,'0')}`;
+      doc.fontSize(10).text(`ID ${uid}`, ml, ph - mb + 10);
+      doc.text(`Page ${pageIndex}`, pw - mr - 60, ph - mb + 10);
+      doc.y = yHeader + 20;
+      return { xName, xBatch, xInterviewer, xDate, xStatus, xScore };
+    };
 
+    let cols = drawChrome();
     rows.forEach(r => {
       const date = r.date ? new Date(r.date).toLocaleDateString() : '-';
       const score = (typeof r.examScore === 'number' ? r.examScore : (r.examScore ?? '-'));
+      if (doc.y > doc.page.height - doc.page.margins.bottom - 40) { doc.addPage(); cols = drawChrome(); }
       const y = doc.y;
-      doc.text(`${r.studentName || '-'}`, xName, y, { continued: true });
-      doc.text(`${r.batch || '-'}`, xBatch, y, { continued: true });
-      doc.text(`${r.interviewerName || '-'}`, xInterviewer, y, { continued: true });
-      doc.text(`${date}`, xDate, y, { continued: true });
-      doc.text(`${r.result || 'PENDING'}`, xStatus, y, { continued: true });
-      doc.text(`${score}`, xScore, y);
+      doc.text(`${r.studentName || '-'}`, cols.xName, y, { continued: true });
+      doc.text(`${r.batch || '-'}`, cols.xBatch, y, { continued: true });
+      doc.text(`${r.interviewerName || '-'}`, cols.xInterviewer, y, { continued: true });
+      doc.text(`${date}`, cols.xDate, y, { continued: true });
+      doc.text(`${r.result || 'PENDING'}`, cols.xStatus, y, { continued: true });
+      doc.text(`${score}`, cols.xScore, y);
     });
 
     doc.end();
