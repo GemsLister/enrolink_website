@@ -39,6 +39,7 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (!open) return null
 
@@ -64,6 +65,19 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
     try {
       if (!summary) throw new Error('Title is required')
       if (!start || !end) throw new Error('Start and end are required')
+      const nameKey = String(summary || '').trim().toLowerCase()
+      if (nameKey) {
+        const farPast = '1970-01-01T00:00:00.000Z'
+        const farFuture = '2100-01-01T00:00:00.000Z'
+        const dupData = await api.calendarEvents(token, { timeMin: farPast, timeMax: farFuture, calendarId: calendarPick || 'primary' })
+        const dupItems = Array.isArray(dupData?.events) ? dupData.events : (Array.isArray(dupData?.items) ? dupData.items : (Array.isArray(dupData) ? dupData : []))
+        const hasDup = dupItems.some((ev) => {
+          const nm = String(ev.summary || ev.title || '').trim().toLowerCase()
+          const id = ev.id || ev._id || ''
+          return nm === nameKey && (!initial?.id || id !== initial.id)
+        })
+        if (hasDup) throw new Error('A schedule with this name already exists')
+      }
       const parseDate = (value) => {
         if (!value) return null
         const parsed = new Date(value)
@@ -117,25 +131,21 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
 
   async function handleDelete() {
     if (!token || !initial?.id) return
-    const confirmed = window.confirm('Delete this schedule? This action cannot be undone.')
-    if (!confirmed) return
     try {
       setDeleteLoading(true)
       setError('')
-      // Delete from backend (which deletes from both database and Google Calendar)
       await api.calendarDelete(token, initial.id)
-      console.log(`Event ${initial.id} deleted successfully from database and Google Calendar`)
       onCreated?.() // Refresh the calendar
       onClose?.()
     } catch (err) {
-      console.error('Error deleting event:', err)
-      setError(err.message || 'Failed to delete schedule')
+      setError(err.message || 'Failed to archive schedule')
     } finally {
       setDeleteLoading(false)
     }
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[1000] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_18px_36px_rgba(0,0,0,0.12)] border border-[#efccd2]">
@@ -197,11 +207,11 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
             {initial?.id ? (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmOpen(true)}
                 disabled={deleteLoading}
                 className="h-9 rounded-md bg-white text-red-600 text-[13px] font-semibold border border-red-200 px-3 disabled:opacity-50"
               >
-                {deleteLoading ? 'Deleting…' : 'Delete'}
+                {deleteLoading ? 'Archiving…' : 'Archive'}
               </button>
             ) : <span />}
             <div className="flex items-center gap-2">
@@ -212,7 +222,21 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
             </div>
           </div>
         </form>
+    </div>
+  </div>
+  {confirmOpen && (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmOpen(false)} />
+      <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#f4c3c6] to-[#f3b1b7] p-6 border-2 border-[#6b2b2b] shadow-[0_35px_90px_rgba(239,150,150,0.35)]">
+        <div className="text-center text-[#6b2b2b] font-bold text-lg mb-2">Archive this schedule?</div>
+        <p className="text-center text-[#6b2b2b] text-sm">This action will remove it from active lists.</p>
+        <div className="mt-4 flex justify-center gap-3">
+          <button onClick={handleDelete} disabled={deleteLoading} className="rounded-full bg-[#6b0000] text-white px-6 py-2 disabled:opacity-50">{deleteLoading ? 'Archiving…' : 'Continue'}</button>
+          <button onClick={() => setConfirmOpen(false)} className="rounded-full bg-white text-[#6b2b2b] border border-[#6b2b2b] px-6 py-2">Cancel</button>
+        </div>
       </div>
     </div>
+  )}
+  </>
   )
 }

@@ -474,7 +474,6 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSelected, setExportSelected] = useState([])
   const [exportScope, setExportScope] = useState('filtered')
-  const [exportOrientation, setExportOrientation] = useState('landscape')
   const [exportPaperSize, setExportPaperSize] = useState('A4')
   const [selectedRows, setSelectedRows] = useState([])
   const [confirmArchiveIds, setConfirmArchiveIds] = useState([])
@@ -1098,7 +1097,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     ])
     const autoTable = autoTableModule.default
     const formatMap = { A4: 'a4', Letter: 'letter', Legal: 'legal' }
-    const doc = new jsPDF({ orientation: exportOrientation, unit: 'mm', format: formatMap[exportPaperSize] || 'a4' })
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: formatMap[exportPaperSize] || 'a4' })
 
     let y = 10
     doc.setFontSize(16)
@@ -1766,14 +1765,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-[#5b1a30]">Orientation</p>
                 <div className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={exportOrientation === 'landscape'} onChange={() => setExportOrientation('landscape')} />
-                    Landscape
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={exportOrientation === 'portrait'} onChange={() => setExportOrientation('portrait')} />
-                    Portrait
-                  </label>
+                  <span className="inline-flex items-center gap-2">
+                    <input type="radio" checked readOnly />
+                    Landscape only
+                  </span>
                 </div>
               </div>
             </div>

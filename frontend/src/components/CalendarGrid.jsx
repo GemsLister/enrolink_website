@@ -27,6 +27,9 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   const [currentView, setCurrentView] = useState("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const rangeRef = useRef({ start: null, end: null });
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiveConfirmIds, setArchiveConfirmIds] = useState([]);
+  const [archiveConfirmLoading, setArchiveConfirmLoading] = useState(false);
 
   // Use the provided calendar ID or fall back to environment variable or 'primary'
   const calendarId = propCalendarId || import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'primary';
@@ -208,9 +211,6 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   const handleDeleteEvent = useCallback(async (eventId) => {
     if (!token || !eventId) return;
     
-    const confirmed = window.confirm('Delete this event? This action cannot be undone.');
-    if (!confirmed) return;
-
     try {
       setLoading(true);
       setError("");
@@ -227,11 +227,38 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
       console.log(`Event ${eventId} deleted successfully`);
     } catch (err) {
       console.error("Error deleting event:", err);
-      setError(err.message || "Failed to delete event. Please try again.");
+      setError(err.message || "Failed to archive event. Please try again.");
     } finally {
       setLoading(false);
     }
   }, [token, currentView, currentDate, updateEventsForView]);
+
+  const openArchiveConfirm = (ids) => {
+    const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    if (!list.length) return;
+    setArchiveConfirmIds(list);
+    setArchiveConfirmOpen(true);
+  };
+
+  const closeArchiveConfirm = () => {
+    setArchiveConfirmOpen(false);
+    setArchiveConfirmIds([]);
+    setArchiveConfirmLoading(false);
+  };
+
+  const confirmArchive = async () => {
+    if (!token || !archiveConfirmIds.length) { closeArchiveConfirm(); return; }
+    try {
+      setArchiveConfirmLoading(true);
+      for (const id of archiveConfirmIds) {
+        try { await api.calendarDelete(token, id); } catch (_) {}
+      }
+      updateEventsForView(currentView, currentDate);
+      setEvents((prev) => prev.filter(evt => !archiveConfirmIds.includes(evt.id)));
+    } finally {
+      closeArchiveConfirm();
+    }
+  };
 
   // Handle keyboard delete (Delete or Backspace key)
   useEffect(() => {
@@ -239,8 +266,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
       // Only handle delete if an event is selected (modal is open)
       if (showCreate && initial?.id && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
-        handleDeleteEvent(initial.id);
-        setShowCreate(false);
+        openArchiveConfirm([initial.id]);
       }
     };
 
@@ -427,7 +453,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   }
 
   return (
-    <div style={{ height: '800px', padding: '20px' }}>
+    <div style={{ height: '500px', padding: '20px' }}>
       {error && (
         <div className="error-message" style={{ color: 'red', marginBottom: '10px' }}>
           {error}
@@ -452,9 +478,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
                 onClick={() => handleSelectEvent(props.event)}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  if (window.confirm(`Delete "${props.event.title}"? This action cannot be undone.`)) {
-                    handleDeleteEvent(props.event.id);
-                  }
+                  openArchiveConfirm([props.event.id]);
                 }}
               >
                 {props.event.title}
@@ -479,6 +503,21 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
           }}
           calendarId={calendarId}
         />
+      )}
+      {archiveConfirmOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={closeArchiveConfirm} />
+          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#f4c3c6] to-[#f3b1b7] p-6 border-2 border-[#6b2b2b] shadow-[0_35px_90px_rgba(239,150,150,0.35)]">
+            <div className="text-center text-[#6b2b2b] font-bold text-lg mb-2">
+              {archiveConfirmIds.length > 1 ? 'Archive these schedules?' : 'Archive this schedule?'}
+            </div>
+            <p className="text-center text-[#6b2b2b] text-sm">This action will remove it from active lists.</p>
+            <div className="mt-4 flex justify-center gap-3">
+              <button onClick={confirmArchive} disabled={archiveConfirmLoading} className="rounded-full bg-[#6b0000] text-white px-6 py-2 disabled:opacity-50">{archiveConfirmLoading ? 'Archiving…' : 'Continue'}</button>
+              <button onClick={closeArchiveConfirm} className="rounded-full bg-white text-[#6b2b2b] border border-[#6b2b2b] px-6 py-2">Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
