@@ -95,6 +95,7 @@ const IMPORT_HEADERS_APPLICANTS = [
   { key: 'ethicsIntegrity', label: 'rating_ethics' },
   { key: 'qScore', label: 'q_score' },
   { key: 'interviewerDecision', label: 'decision' },
+  { key: 'pScore', label: 'p score (30%) entrance exam' },
   { key: 'sScore', label: 's_score' },
   { key: 'finalScore', label: 'final score' },
   { key: 'remarks', label: 'remarks' },
@@ -518,7 +519,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       const url = `/students${queryString ? `?${queryString}` : ''}`
       const res = await api.get(url)
       const docs = Array.isArray(res?.rows) ? res.rows : []
-      setRows(docs)
+      // Show newest rows first by default; assume API returns insertion-ordered
+      setRows(docs.slice().reverse())
       rowsRef.current = docs
     } catch (error) {
       console.error('Error fetching records:', error)
@@ -1596,15 +1598,21 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                   )}
                                 </div>
                               ) : column.key === 'recordCategory' ? (
-                                <select
-                                  value={value || currentCategory}
-                                  onChange={(event) => handleInlineStatusChange(row, event.target.value)}
-                                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
-                                >
-                                  {CATEGORY_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
+                                isArchiveView || row.archived_at ? (
+                                  <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                                    {value || currentCategory}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={value || currentCategory}
+                                    onChange={(event) => handleInlineStatusChange(row, event.target.value)}
+                                    className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                  >
+                                    {CATEGORY_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
+                                  </select>
+                                )
                               ) : (
                                 <span>
                                   {(() => {
@@ -1843,7 +1851,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                     <>
                       <p>• Source must be WAITLIST, PRIORITY, or VVIP</p>
                       <p>• Interview Date format: MM/DD/YYYY (e.g., 12/09/2004)</p>
-                      <p>• Percentile Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
+                      <p>• Percentile Score, P Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
                       <p>• Rating columns (1-10): rating_academic, rating_skills, rating_teamwork, rating_comm, rating_problem, rating_ethics</p>
                       <p>• SHS Strand: STEM, ABM, HUMSS, or TVL-ICT (or custom text)</p>
                       <p>• Interviewer’s Decision: PASSED, FAILED, or NO RESULT</p>

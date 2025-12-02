@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import NotFound from './pages/NotFound'
 import Login from './pages/Login'
 import HeadLogin from './pages/head/HeadLogin'
 import Signup from './pages/Signup'
@@ -60,7 +61,7 @@ function App() {
       <Route path="/officer/reports" element={<OfficerReports />} />
       <Route path="/officer/batch-management" element={<OfficerBatchManagement />} />
       <Route path="/officer/settings" element={<OfficerSettings />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
