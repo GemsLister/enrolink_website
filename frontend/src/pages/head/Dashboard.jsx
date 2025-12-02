@@ -555,18 +555,7 @@ export default function Dashboard() {
             {summaryCards.map((card) => (
               <div
                 key={card.key}
-                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40 min-w-[220px] cursor-pointer hover:bg-[#fff0f3]"
-                onClick={() => {
-                  const k = String(card.key || "");
-                  const to = k === "applicants"
-                    ? "/head/records/applicants"
-                    : k === "interviewed"
-                    ? "/head/records/enrollees"
-                    : k.startsWith("enrolled_")
-                    ? "/head/records/students"
-                    : null;
-                  if (to) navigate(to);
-                }}
+                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40 min-w-[220px]"
               >
                 <div className="flex items-center justify-center rounded-full w-11 h-11 bg-[#f2c6cf]">
                   {(() => {

@@ -6,6 +6,11 @@ import { api } from '../../api/client'
 import CalendarGrid from '../../components/CalendarGrid'
 import QuickChart from '../../components/QuickChart'
 import ScheduleCreateModal from '../../components/ScheduleCreateModal'
+import RecentAddedIcon from '../../assets/recent-activity-added-student.png'
+import RecentEditedIcon from '../../assets/recent-activty-edited.png'
+import RecentArchiveIcon from '../../assets/recent-activity-icon-archive.png'
+import ApplicantsIcon from '../../assets/applicants.png'
+import ScheduleIcon from '../../assets/Union.png'
 
 function PlaceholderIcon({ size = 'w-11 h-11', variant = 'primary', label = 'icon' }) {
   const styles = {
@@ -55,7 +60,7 @@ export default function OfficerDashboard() {
   const [activities, setActivities] = useState([])
   const [gcal, setGcal] = useState([])
   const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [selectedScheduleIds, setSelectedScheduleIds] = useState([])
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -63,6 +68,23 @@ export default function OfficerDashboard() {
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archiveConfirmIds, setArchiveConfirmIds] = useState([])
   const [archiveConfirmLoading, setArchiveConfirmLoading] = useState(false)
+  const [emcTop, setEmcTop] = useState([])
+  const [itTop, setItTop] = useState([])
+  const [emcConfirmedData, setEmcConfirmedData] = useState([])
+  const [itConfirmedData, setItConfirmedData] = useState([])
+  const [emcConfirmedCounts, setEmcConfirmedCounts] = useState([])
+  const [itConfirmedCounts, setItConfirmedCounts] = useState([])
+  const [includeAllInterviewees, setIncludeAllInterviewees] = useState(true)
+  const [courseFilter, setCourseFilter] = useState('IT')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [emcRowsAll, setEmcRowsAll] = useState([])
+  const [itRowsAll, setItRowsAll] = useState([])
+  const [bsitEnrolledCount, setBsitEnrolledCount] = useState(0)
+  const [bsemcEnrolledCount, setBsemcEnrolledCount] = useState(0)
+  const [emcPassersStrandData, setEmcPassersStrandData] = useState([])
+  const [itPassersStrandData, setItPassersStrandData] = useState([])
+  const [emcPassersStrandCounts, setEmcPassersStrandCounts] = useState([])
+  const [itPassersStrandCounts, setItPassersStrandCounts] = useState([])
 
   useEffect(() => {
     let alive = true
@@ -161,12 +183,210 @@ export default function OfficerDashboard() {
   }, [token, user])
 
   useEffect(() => {
-    if (!gcal.length && selectedScheduleIds.length) {
-      setSelectedScheduleIds([])
-      return
-    }
-    setSelectedScheduleIds((prev) => prev.filter((id) => gcal.some((ev) => ev.id === id)))
+    setSelectedScheduleIds((prev) => {
+      const next = new Set()
+      gcal.forEach((ev) => { if (prev.has(ev.id)) next.add(ev.id) })
+      return next
+    })
   }, [gcal])
+
+  useEffect(() => {
+    let alive = true
+    async function loadLeaderboards() {
+      if (!token) return
+      try {
+        const studentsRes = await api.request('GET', '/students', { token })
+        const reportsRes = await api.request('GET', '/reports', { token })
+        const students = Array.isArray(studentsRes?.rows) ? studentsRes.rows : []
+        const reports = Array.isArray(reportsRes?.rows) ? reportsRes.rows : []
+        const examMap = new Map()
+        for (const r of reports) {
+          const key = String(r.studentName || '').trim().toLowerCase()
+          if (!key) continue
+          const val = typeof r.examScore === 'number' ? r.examScore : (r.examScore ?? undefined)
+          examMap.set(key, val)
+        }
+        const emcRows = []
+        const itRows = []
+        for (const s of students) {
+          const name1 = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase()
+          const name2 = `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase()
+          const key = name1 || name2
+          if (!key) continue
+          const course = String(s.course || s.preferredCourse || '').toUpperCase()
+          const examScore = examMap.get(key)
+          const entry = {
+            firstName: s.firstName || '',
+            lastName: s.lastName || '',
+            email: s.email || '',
+            percentileScore: s.percentileScore || '',
+            qScore: s.qScore || '',
+            sScore: s.sScore || '',
+            finalScore: s.finalScore || '',
+            examScore,
+            interviewDate: s.interviewDate || '',
+            shsStrand: s.shsStrand || '',
+            interviewerDecision: s.interviewerDecision || '',
+            recordCategory: s.recordCategory || '',
+            enrollmentStatus: s.enrollmentStatus || '',
+          }
+          if (course.includes('EMC')) emcRows.push(entry)
+          else if (course.includes('IT')) itRows.push(entry)
+        }
+        const bsitEnrolled = students.filter((s) => {
+          const rc = String(s.recordCategory || '').toUpperCase()
+          const course = String(s.course || s.preferredCourse || '').toUpperCase()
+          return rc === 'STUDENT' && course.includes('IT')
+        }).length
+        const bsemcEnrolled = students.filter((s) => {
+          const rc = String(s.recordCategory || '').toUpperCase()
+          const course = String(s.course || s.preferredCourse || '').toUpperCase()
+          return rc === 'STUDENT' && course.includes('EMC')
+        }).length
+        const rankVal = (row) => {
+          const f = Number(row.finalScore)
+          if (Number.isFinite(f)) return f
+          const e = Number(row.examScore)
+          return Number.isFinite(e) ? e : -Infinity
+        }
+        emcRows.sort((a, b) => rankVal(b) - rankVal(a))
+        itRows.sort((a, b) => rankVal(b) - rankVal(a))
+        if (!alive) return
+        setBsitEnrolledCount(bsitEnrolled)
+        setBsemcEnrolledCount(bsemcEnrolled)
+        setEmcTop(emcRows.slice(0, 60))
+        setItTop(itRows.slice(0, 120))
+
+        const buildConfirmedChart = (rows) => {
+          const confirmed = includeAllInterviewees ? rows : rows.filter(r => !!r.interviewDate)
+          const counts = new Map()
+          const formatPct = (val) => {
+            if (val === undefined || val === null) return ''
+            if (typeof val === 'number' && Number.isFinite(val)) return `${val.toFixed(2)}%`
+            const txt = String(val).trim()
+            const m = txt.match(/^(\d+(?:\.\d+)?)\s*%?$/)
+            if (m) return `${parseFloat(m[1]).toFixed(2)}%`
+            return txt
+          }
+          for (const r of confirmed) {
+            const pct = r.percentileScore ?? ''
+            const fscore = r.finalScore ?? ''
+            const fallback = Number(r.examScore)
+            const label = formatPct(pct || fscore || (Number.isFinite(fallback) ? fallback : ''))
+            if (!label) continue
+            counts.set(label, (counts.get(label) || 0) + 1)
+          }
+          const labels = Array.from(counts.keys())
+          labels.sort((a, b) => {
+            const pa = parseFloat(String(a).replace('%', ''))
+            const pb = parseFloat(String(b).replace('%', ''))
+            if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb
+            return String(a).localeCompare(String(b))
+          })
+          const rowsData = labels.map(l => [l, counts.get(l)])
+          const countsList = labels.map(l => ({ label: l, count: counts.get(l) }))
+          const total = confirmed.length
+          rowsData.push(['Grand Total', total])
+          countsList.push({ label: 'Grand Total', count: total })
+          return { data: [['Percentile Score', 'No of Confirmed Interviewees'], ...rowsData], counts: countsList }
+        }
+        const emcChart = buildConfirmedChart(emcRows)
+        const itChart = buildConfirmedChart(itRows)
+        setEmcConfirmedData(emcChart.data)
+        setItConfirmedData(itChart.data)
+        setEmcConfirmedCounts(emcChart.counts)
+        setItConfirmedCounts(itChart.counts)
+        setEmcRowsAll(emcRows)
+        setItRowsAll(itRows)
+
+        const buildPassersByStrand = (rows) => {
+          const norm = (t) => {
+            const v = String(t || '').trim().toUpperCase()
+            if (!v) return ''
+            if (v.includes('STEM')) return 'STEM'
+            if (v.includes('ABM')) return 'ABM'
+            if (v.includes('HUMSS')) return 'HUMSS'
+            if (v.includes('TVL')) return 'TVL-ICT'
+            return v
+          }
+          const passed = rows.filter(r => String(r.interviewerDecision || '').trim().toUpperCase() === 'PASSED')
+          const counts = new Map()
+          for (const r of passed) {
+            const key = norm(r.shsStrand)
+            if (!key) continue
+            counts.set(key, (counts.get(key) || 0) + 1)
+          }
+          const labels = Array.from(counts.keys())
+          labels.sort((a, b) => {
+            const order = { 'STEM': 0, 'ABM': 1, 'HUMSS': 2, 'TVL-ICT': 3 }
+            const ai = order[a] ?? 99
+            const bi = order[b] ?? 99
+            return ai - bi
+          })
+          const rowsData = labels.map(l => [l, counts.get(l)])
+          const list = labels.map(l => ({ label: l, count: counts.get(l) }))
+          const total = passed.length
+          rowsData.push(['Grand Total', total])
+          list.push({ label: 'Grand Total', count: total })
+          return { data: [['SHS Strand', 'No. of Students who passed interview'], ...rowsData], counts: list }
+        }
+        const emcStrand = buildPassersByStrand(emcRows)
+        const itStrand = buildPassersByStrand(itRows)
+        setEmcPassersStrandData(emcStrand.data)
+        setItPassersStrandData(itStrand.data)
+        setEmcPassersStrandCounts(emcStrand.counts)
+        setItPassersStrandCounts(itStrand.counts)
+      } catch (_) {
+        if (!alive) return
+        setEmcTop([])
+        setItTop([])
+        setEmcConfirmedData([])
+        setItConfirmedData([])
+      }
+    }
+    loadLeaderboards()
+    return () => { alive = false }
+  }, [token])
+
+  useEffect(() => {
+    const build = (rows) => {
+      const list = includeAllInterviewees ? rows : rows.filter(r => !!r.interviewDate)
+      const counts = new Map()
+      const fmt = (val) => {
+        if (val === undefined || val === null) return ''
+        if (typeof val === 'number' && Number.isFinite(val)) return `${val.toFixed(2)}%`
+        const txt = String(val).trim()
+        const m = txt.match(/^(\d+(?:\.\d+)?)\s*%?$/)
+        return m ? `${parseFloat(m[1]).toFixed(2)}%` : txt
+      }
+      for (const r of list) {
+        const pct = r.percentileScore ?? ''
+        const fscore = r.finalScore ?? ''
+        const fallback = Number(r.examScore)
+        const label = fmt(pct || fscore || (Number.isFinite(fallback) ? fallback : ''))
+        if (!label) continue
+        counts.set(label, (counts.get(label) || 0) + 1)
+      }
+      const labels = Array.from(counts.keys()).sort((a, b) => {
+        const pa = parseFloat(String(a).replace('%', ''))
+        const pb = parseFloat(String(b).replace('%', ''))
+        if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb
+        return String(a).localeCompare(String(b))
+      })
+      const rowsData = labels.map(l => [l, counts.get(l)])
+      const countsList = labels.map(l => ({ label: l, count: counts.get(l) }))
+      const total = list.length
+      rowsData.push(['Grand Total', total])
+      countsList.push({ label: 'Grand Total', count: total })
+      return { data: [['Percentile Score', 'No of Confirmed Interviewees'], ...rowsData], counts: countsList }
+    }
+    const emcChart = build(emcRowsAll)
+    const itChart = build(itRowsAll)
+    setEmcConfirmedData(emcChart.data)
+    setItConfirmedData(itChart.data)
+    setEmcConfirmedCounts(emcChart.counts)
+    setItConfirmedCounts(itChart.counts)
+  }, [includeAllInterviewees, emcRowsAll, itRowsAll])
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
@@ -175,9 +395,9 @@ export default function OfficerDashboard() {
   const summaryCards = [
     { label: 'Total Applicant', value: totals.totalApplicants },
     { label: 'Interviewed', value: totals.interviewed },
-    { label: 'Passed Interview', value: totals.passedInterview },
-    { label: 'Enrolled', value: totals.enrolled },
-    { label: 'AWOL', value: totals.awol },
+    { label: 'Enrolled BSIT', value: bsitEnrolledCount },
+    { label: 'Enrolled BSEMC', value: bsemcEnrolledCount },
+    { label: 'Enrolled All Students', value: (bsitEnrolledCount + bsemcEnrolledCount) },
   ]
 
   const batches = stats.batchAnalytics || []
@@ -259,22 +479,23 @@ export default function OfficerDashboard() {
     }
   }
 
-  const allSchedulesSelected = gcal.length > 0 && selectedScheduleIds.length === gcal.length
+  const allSchedulesSelected = gcal.length > 0 && selectedScheduleIds.size === gcal.length
 
   const toggleSelectAllSchedules = () => {
-    if (allSchedulesSelected) {
-      setSelectedScheduleIds([])
-    } else {
-      setSelectedScheduleIds(gcal.map((ev) => ev.id))
-    }
+    setSelectedScheduleIds((prev) => {
+      if (allSchedulesSelected) return new Set()
+      const next = new Set()
+      gcal.forEach((ev) => { if (ev.id) next.add(ev.id) })
+      return next
+    })
   }
 
   const toggleScheduleSelection = (id) => {
     setSelectedScheduleIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id)
-      }
-      return [...prev, id]
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
   }
 
@@ -286,6 +507,10 @@ export default function OfficerDashboard() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
+            <button onClick={() => setActiveTab('leaderboards')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
+          </div>
           <p className="mt-3 flex items-center gap-2 text-sm text-[#6e2a39]">
             <span>Showing for:</span>
             <select value={startYear} onChange={(e)=>setStartYear(e.target.value)} className="font-semibold bg-transparent text-[#6e2a39] border-none outline-none cursor-pointer underline decoration-[#6e2a39]/30 decoration-2">
@@ -293,7 +518,16 @@ export default function OfficerDashboard() {
                 <option key={yr} value={yr} className="text-[#6e2a39]">{formatSY(yr)}</option>
               ))}
             </select>
+            <label className="ml-4 inline-flex items-center gap-2">
+              <span>Show:</span>
+              <select value={courseFilter} onChange={(e)=>setCourseFilter(e.target.value)} className="font-semibold bg-transparent text-[#6e2a39] border border-[#efccd2] rounded-md px-2 py-1">
+                <option value="IT">BSIT</option>
+                <option value="EMC">BSEMC</option>
+                <option value="ALL">All</option>
+              </select>
+            </label>
           </p>
+          {activeTab === 'overview' && (
           <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {summaryCards.map((card, idx) => (
               <div key={card.label} className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40">
@@ -357,6 +591,163 @@ export default function OfficerDashboard() {
               onCreated={refreshCalendar}
             />
           )}
+          )}
+          {activeTab === 'leaderboards' && (
+            <section className="mt-6 grid grid-cols-1 gap-6">
+              {(courseFilter === 'EMC') && (
+                <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
+                  <div className="mt-4">
+                    {emcTop.length === 0 ? (
+                      <div className="text-sm text-[#a86a74]">No data.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-[#7d102a]">
+                          <thead>
+                            <tr className="text-xs text-[#a86a74]">
+                              <th className="text-left px-2 py-2">#</th>
+                              <th className="text-left px-2 py-2">Last Name</th>
+                              <th className="text-left px-2 py-2">First Name</th>
+                              <th className="text-left px-2 py-2">Email Address</th>
+                              <th className="text-left px-2 py-2">Final Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {emcTop.map((row, idx) => (
+                              <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                                <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                                <td className="px-2 py-2">{row.lastName || '—'}</td>
+                                <td className="px-2 py-2">{row.firstName || '—'}</td>
+                                <td className="px-2 py-2">{row.email || '—'}</td>
+                                <td className="px-2 py-2">
+                                  <div className="font-semibold">{row.finalScore || '—'}</div>
+                                  <div className="text-xs text-[#a86a74]">Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}</div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {(courseFilter === 'IT') && (
+                <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                  <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+                  <div className="mt-4">
+                    {itTop.length === 0 ? (
+                      <div className="text-sm text-[#a86a74]">No data.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-[#7d102a]">
+                          <thead>
+                            <tr className="text-xs text-[#a86a74]">
+                              <th className="text-left px-2 py-2">#</th>
+                              <th className="text-left px-2 py-2">Last Name</th>
+                              <th className="text-left px-2 py-2">First Name</th>
+                              <th className="text-left px-2 py-2">Email Address</th>
+                              <th className="text-left px-2 py-2">Final Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {itTop.map((row, idx) => (
+                              <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                                <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                                <td className="px-2 py-2">{row.lastName || '—'}</td>
+                                <td className="px-2 py-2">{row.firstName || '—'}</td>
+                                <td className="px-2 py-2">{row.email || '—'}</td>
+                                <td className="px-2 py-2">
+                                  <div className="font-semibold">{row.finalScore || '—'}</div>
+                                  <div className="text-xs text-[#a86a74]">Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}</div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {(courseFilter === 'ALL') && (
+                <>
+                  <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                    <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
+                    <div className="mt-4">
+                      {emcTop.length === 0 ? (
+                        <div className="text-sm text-[#a86a74]">No data.</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-[#7d102a]">
+                            <thead>
+                              <tr className="text-xs text-[#a86a74]">
+                                <th className="text-left px-2 py-2">#</th>
+                                <th className="text-left px-2 py-2">Last Name</th>
+                                <th className="text-left px-2 py-2">First Name</th>
+                                <th className="text-left px-2 py-2">Email Address</th>
+                                <th className="text-left px-2 py-2">Final Score</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {emcTop.map((row, idx) => (
+                                <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                                  <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                                  <td className="px-2 py-2">{row.lastName || '—'}</td>
+                                  <td className="px-2 py-2">{row.firstName || '—'}</td>
+                                  <td className="px-2 py-2">{row.email || '—'}</td>
+                                  <td className="px-2 py-2">
+                                    <div className="font-semibold">{row.finalScore || '—'}</div>
+                                    <div className="text-xs text-[#a86a74]">Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}</div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
+                    <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+                    <div className="mt-4">
+                      {itTop.length === 0 ? (
+                        <div className="text-sm text-[#a86a74]">No data.</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-[#7d102a]">
+                            <thead>
+                              <tr className="text-xs text-[#a86a74]">
+                                <th className="text-left px-2 py-2">#</th>
+                                <th className="text-left px-2 py-2">Last Name</th>
+                                <th className="text-left px-2 py-2">First Name</th>
+                                <th className="text-left px-2 py-2">Email Address</th>
+                                <th className="text-left px-2 py-2">Final Score</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {itTop.map((row, idx) => (
+                                <tr key={`${row.lastName}-${row.firstName}-${idx}`} className="border-t border-[#efccd2]">
+                                  <td className="px-2 py-2 font-semibold">{String(idx + 1).padStart(2, '0')}</td>
+                                  <td className="px-2 py-2">{row.lastName || '—'}</td>
+                                  <td className="px-2 py-2">{row.firstName || '—'}</td>
+                                  <td className="px-2 py-2">{row.email || '—'}</td>
+                                  <td className="px-2 py-2">
+                                    <div className="font-semibold">{row.finalScore || '—'}</div>
+                                    <div className="text-xs text-[#a86a74]">Percentile: {row.percentileScore || '—'} • Score: {row.examScore ?? '—'} • Q: {row.qScore || '—'} • S: {row.sScore || '—'}</div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
         </main>
         <aside className="bg-[#fbf3f4] px-4 py-6 sm:px-6 lg:px-6 lg:py-8 lg:border-l lg:border-[#efccd2]">
           {/* Simplified right column for officers; mirrors head */}
@@ -386,33 +777,27 @@ export default function OfficerDashboard() {
                   <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-[#efccd2] bg-white shadow-2xl text-sm text-[#5b1a30] z-[1000]">
                     <div className="px-4 py-2 border-b border-[#f3d9de] font-semibold text-xs text-[#7d102a]">Notifications</div>
                     <ul className="max-h-56 overflow-auto py-1">
-                      {assignedLabel ? (
-                        (() => {
-                          const updated = localStorage.getItem('assigned_batch_updated') === '1'
-                          if (updated) localStorage.removeItem('assigned_batch_updated')
-                          return (
-                            <>
-                              {updated && (
-                                <li className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
-                                  <div className="w-7 h-7 rounded-full bg-[#f2c6cf] text-[#8a1d35] flex items-center justify-center text-[10px] font-semibold">UPD</div>
-                                  <div className="flex-1">
-                                    <div className="font-semibold">Batch updated</div>
-                                    <div className="text-xs text-[#8b4a5d]">You are now assigned to {assignedLabel}</div>
-                                  </div>
-                                </li>
-                              )}
-                              <li className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
-                                <div className="w-7 h-7 rounded-full bg-[#f0d9dd] text-[#b0475c] flex items-center justify-center text-[10px] font-semibold">INF</div>
-                                <div className="flex-1">
-                                  <div className="font-semibold">Assigned batch</div>
-                                  <div className="text-xs text-[#8b4a5d]">You are assigned to {assignedLabel}</div>
-                                </div>
-                              </li>
-                            </>
-                          )
-                        })()
-                      ) : (
+                      {activities.length === 0 ? (
                         <li className="px-4 py-3 text-[#8c7f86]">No notifications yet</li>
+                      ) : (
+                        activities.slice(0, 10).map((ev, idx) => {
+                          const when = ev.when || ev.createdAt
+                          const label = `${ev.actor || ''}`.trim() || 'Officer'
+                          const accepted = String(ev.action || '').toLowerCase().includes('accepted')
+                          return (
+                            <li key={idx} className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
+                              {(() => {
+                                const a = String(ev.action || '').toLowerCase()
+                                const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon))
+                                return <img src={src} alt="" className="w-7 h-7 rounded-full" />
+                              })()}
+                              <div className="flex-1">
+                                <div className="font-semibold">{label}</div>
+                                <div className="text-xs text-[#8b4a5d]">{accepted ? `Accepted invite ${timeAgo(when)}` : `${ev.action || 'Activity'} ${timeAgo(when)}`}</div>
+                              </div>
+                            </li>
+                          )
+                        })
                       )}
                     </ul>
                   </div>
@@ -425,9 +810,9 @@ export default function OfficerDashboard() {
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-sm font-bold text-[#7d102a]">Schedules</h2>
               <div className="flex items-center gap-2">
-                {selectedScheduleIds.length > 0 && (
+                {selectedScheduleIds.size > 0 && (
                   <span className="text-xs text-[#7d102a] font-semibold">
-                    {selectedScheduleIds.length} selected
+                    {selectedScheduleIds.size} selected
                   </span>
                 )}
                 <button
@@ -445,10 +830,10 @@ export default function OfficerDashboard() {
                 <button
                   type="button"
                   onClick={deleteSelectedSchedules}
-                  disabled={!selectedScheduleIds.length || bulkDeleting}
+                  disabled={selectedScheduleIds.size === 0 || bulkDeleting}
                   className="text-xs font-semibold px-3 py-1 rounded-full border border-[#efccd2] text-white bg-[#b0475c] hover:bg-[#8a1d35] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {bulkDeleting ? 'Deleting…' : 'Delete selected'}
+                  {bulkDeleting ? 'Archiving…' : 'Archive selected'}
                 </button>
               </div>
             </div>
@@ -457,7 +842,7 @@ export default function OfficerDashboard() {
             {gcal.map(ev => {
                 const when = ev.start?.dateTime || ev.start?.date
                 const dt = when ? new Date(when) : null
-                const isSelected = selectedScheduleIds.includes(ev.id)
+                const isSelected = selectedScheduleIds.has(ev.id)
                 return (
                   <div key={ev.id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(139,23,47,0.08)] border border-[#efccd2]">
                     <div className="flex items-center gap-3">
@@ -465,10 +850,17 @@ export default function OfficerDashboard() {
                         type="checkbox"
                         className="h-4 w-4 accent-[#8a1d35]"
                         checked={isSelected}
-                        onChange={() => toggleScheduleSelection(ev.id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setSelectedScheduleIds(prev => {
+                            const next = new Set(prev)
+                            if (checked) next.add(ev.id); else next.delete(ev.id)
+                            return next
+                          })
+                        }}
                         aria-label={`Select ${ev.summary || 'schedule'}`}
                       />
-                      <div className="flex items-center justify-center rounded-full font-semibold uppercase tracking-[0.2em] text-[10px] w-12 h-12 bg-white text-[#b0475c] border border-[#efccd2]">icon</div>
+                      <img src={ScheduleIcon} alt="" className="w-12 h-12 rounded-full" />
                       <div className="text-sm leading-relaxed text-[#7d102a]">
                         <p className="font-semibold">{ev.summary || 'Untitled Event'}</p>
                         <p className="text-xs text-[#a86a74]">{dt ? dt.toLocaleString() : ''}</p>
@@ -478,9 +870,9 @@ export default function OfficerDashboard() {
                       <button
                         onClick={() => openArchiveConfirm([ev.id])}
                         className="ml-2 rounded-full border border-[#efccd2] text-[#7d102a] hover:bg-[#f8e7eb] px-3 py-1 text-xs"
-                        title="Delete schedule"
+                        title="Archive schedule"
                       >
-                        Delete
+                        Archive
                       </button>
                     )}
                   </div>
