@@ -148,7 +148,7 @@ export async function pdf(req, res, next) {
       });
     }
 
-    const doc = new PDFDocument({ margin: 40 });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="interview-report.pdf"');
     doc.pipe(res);
@@ -157,25 +157,38 @@ export async function pdf(req, res, next) {
     if (req.query.batch) doc.moveDown(0.5).fontSize(12).text(`Batch: ${req.query.batch}`, { align: 'center' });
     doc.moveDown();
 
-    // Header matching fields visible in Student Records
-    doc.fontSize(12).text('Student Name', 40, doc.y, { continued: true });
-    doc.text('Batch', 200, doc.y, { continued: true });
-    doc.text('Interviewer', 260, doc.y, { continued: true });
-    doc.text('Interview Date', 360, doc.y, { continued: true });
-    doc.text('Status', 460, doc.y, { continued: true });
-    doc.text('Exam Score', 520, doc.y);
+    doc.fontSize(12);
+    const pageWidth = doc.page.width;
+    const ml = doc.page.margins.left;
+    const mr = doc.page.margins.right;
+    const available = pageWidth - ml - mr;
+    const xName = ml + available * 0.00;
+    const xBatch = ml + available * 0.28;
+    const xInterviewer = ml + available * 0.44;
+    const xDate = ml + available * 0.62;
+    const xStatus = ml + available * 0.78;
+    const xScore = ml + available * 0.90;
+    const yHeader = doc.y;
+    doc.text('Student Name', xName, yHeader, { continued: true });
+    doc.text('Batch', xBatch, yHeader, { continued: true });
+    doc.text('Interviewer', xInterviewer, yHeader, { continued: true });
+    doc.text('Interview Date', xDate, yHeader, { continued: true });
+    doc.text('Status', xStatus, yHeader, { continued: true });
+    doc.text('Exam Score', xScore, yHeader);
     doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(570, doc.y).stroke();
+    const yLine = doc.y;
+    doc.moveTo(ml, yLine).lineTo(pageWidth - mr, yLine).stroke();
 
     rows.forEach(r => {
       const date = r.date ? new Date(r.date).toLocaleDateString() : '-';
       const score = (typeof r.examScore === 'number' ? r.examScore : (r.examScore ?? '-'));
-      doc.text(`${r.studentName || '-'}`, 40, doc.y, { continued: true });
-      doc.text(`${r.batch || '-'}`, 200, doc.y, { continued: true });
-      doc.text(`${r.interviewerName || '-'}`, 260, doc.y, { continued: true });
-      doc.text(`${date}`, 360, doc.y, { continued: true });
-      doc.text(`${r.result || 'PENDING'}`, 460, doc.y, { continued: true });
-      doc.text(`${score}`, 520, doc.y);
+      const y = doc.y;
+      doc.text(`${r.studentName || '-'}`, xName, y, { continued: true });
+      doc.text(`${r.batch || '-'}`, xBatch, y, { continued: true });
+      doc.text(`${r.interviewerName || '-'}`, xInterviewer, y, { continued: true });
+      doc.text(`${date}`, xDate, y, { continued: true });
+      doc.text(`${r.result || 'PENDING'}`, xStatus, y, { continued: true });
+      doc.text(`${score}`, xScore, y);
     });
 
     doc.end();
