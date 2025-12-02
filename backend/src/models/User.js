@@ -22,6 +22,11 @@ UserSchema.add({
   archivedAt: { type: Date, default: null }
 });
 
+// Hidden Google events per user (to suppress visibility when deletion fails upstream)
+UserSchema.add({
+  hiddenGoogleEventIds: { type: [String], default: [] }
+});
+
 let _model;
 export function getOfficerUserModel() {
   if (!_model) {

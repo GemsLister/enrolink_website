@@ -112,6 +112,12 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     [calendarId, token]
   );
 
+  // Clear events when account token changes to avoid cross-account duplication
+  useEffect(() => {
+    setEvents([]);
+    setError("");
+  }, [token]);
+
   const handleSelectSlot = useCallback((slotInfo) => {
     const { start, end, allDay } = slotInfo;
     setInitial({

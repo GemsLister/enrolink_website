@@ -7,7 +7,7 @@ import { google } from 'googleapis';
 async function fetchDatabaseEvents(userId, { timeMin, timeMax }) {
   if (!userId) return [];
 
-  const query = { user: userId };
+  const query = { user: userId, hidden: false };
   const startRange = {};
   const endRange = {};
 
@@ -73,6 +73,8 @@ export async function list(req, res, next) {
     const { timeMin, timeMax } = req.query;
     const cid = await getCalendarId(req);
     const userId = req.user?.id || null;
+    const shouldSync = String(process.env.SYNC_GOOGLE_TO_DB || 'true').toLowerCase() !== 'false';
+    const showGoogle = String(process.env.SHOW_GOOGLE_EVENTS || 'true').toLowerCase() !== 'false';
     
     // Check if using simple calendar (database-only mode)
     if (String(process.env.USE_SIMPLE_CALENDAR || '').toLowerCase() === 'true') {
@@ -91,12 +93,16 @@ export async function list(req, res, next) {
     
     // Try to get events from Google Calendar
     try {
+      if (!showGoogle) {
+        const onlyDb = userId ? await fetchDatabaseEvents(userId, { timeMin, timeMax }) : [];
+        return res.json({ events: onlyDb });
+      }
       const events = await listEvents(cid, { timeMin, timeMax });
       
       // Automatically sync ALL Google Calendar events to database first
       // This includes both existing events and new events created directly in Google Calendar
       let syncedEventIds = new Set();
-      if (userId && events && events.length > 0) {
+      if (shouldSync && userId && events && events.length > 0) {
         try {
           // Sync each event to database
           for (const gEvent of events) {
@@ -161,12 +167,13 @@ export async function list(req, res, next) {
       // If Google returned events successfully, remove any database events (for this user)
       // that were previously synced to Google but no longer exist there within the same range.
       // This ensures deletions done directly in Google Calendar propagate to the local database.
-      if (userId) {
+      if (shouldSync && userId) {
         try {
           const googleIds = new Set((events || []).map(ev => ev.id).filter(Boolean));
           const deletionQuery = {
             user: userId,
-            googleEventId: { $exists: true, $ne: null }
+            googleEventId: { $exists: true, $ne: null },
+            hidden: false
           };
           // Apply time range filters if provided (same logic as fetchDatabaseEvents)
           const startRange = {};
@@ -215,6 +222,30 @@ export async function list(req, res, next) {
           googleEventMap.set(event.id, event);
         }
       });
+
+      // Filter out Google events that were explicitly hidden by the current user
+      if (userId) {
+        try {
+          let hiddenIds = [];
+          if (req.user?.role === 'DEPT_HEAD') {
+            const HeadUser = (await import('../models/HeadUser.js')).default;
+            const head = await HeadUser.findById(userId).select('hiddenGoogleEventIds').lean();
+            hiddenIds = Array.isArray(head?.hiddenGoogleEventIds) ? head.hiddenGoogleEventIds : [];
+          } else {
+            const { getOfficerUserModel } = await import('../models/User.js');
+            const OfficerUser = getOfficerUserModel();
+            const off = await OfficerUser.findById(userId).select('hiddenGoogleEventIds').lean();
+            hiddenIds = Array.isArray(off?.hiddenGoogleEventIds) ? off.hiddenGoogleEventIds : [];
+          }
+          if (hiddenIds.length) {
+            for (const hid of hiddenIds) {
+              if (googleEventMap.has(hid)) googleEventMap.delete(hid);
+            }
+          }
+        } catch (_) {
+          // ignore filtering errors
+        }
+      }
       
       // Add database-only events that don't exist in Google Calendar
       // (Events without googleEventId remain visible even if not in Google, e.g., offline or failed sync)
@@ -290,9 +321,10 @@ export async function remove(req, res, next) {
     
     const isDbOnlyId = id.startsWith('db_');
     const possibleDbId = isDbOnlyId ? id.substring(3) : id;
-    let deletedFromGoogle = false;
-    let deletedFromDatabase = false;
-    let googleEventIdToDelete = null;
+  let deletedFromGoogle = false;
+  let deletedFromDatabase = false;
+  let googleEventIdToDelete = null;
+  let appliedHidden = false;
     
     // First, try to find the event in database to get googleEventId if deleting by database ID
     const userId = req.user?.id;
@@ -334,40 +366,65 @@ export async function remove(req, res, next) {
       googleEventIdToDelete = id; // Assume the ID is the googleEventId
     }
     
-    // Delete from Google Calendar if we have a googleEventId
-    if (googleEventIdToDelete) {
-      try {
-        await gcalDelete(cid, googleEventIdToDelete);
-        deletedFromGoogle = true;
-      } catch (gcalError) {
-        const statusCode = gcalError?.response?.status || gcalError?.code;
-        if (statusCode === 404) {
-          console.warn(`Google Calendar event ${googleEventIdToDelete} not found; continuing with database cleanup.`);
-        } else {
-          console.error('Error deleting from Google Calendar:', gcalError);
-          // Continue with database deletion even if Google Calendar deletion fails
-        }
+  // Delete from Google Calendar if we have a googleEventId
+  if (googleEventIdToDelete) {
+    try {
+      await gcalDelete(cid, googleEventIdToDelete);
+      deletedFromGoogle = true;
+    } catch (gcalError) {
+      const statusCode = gcalError?.response?.status || gcalError?.code;
+      if (statusCode === 404) {
+        console.warn(`Google Calendar event ${googleEventIdToDelete} not found; continuing with database cleanup.`);
+      } else {
+        console.error('Error deleting from Google Calendar:', gcalError);
+        // Mark hidden locally to suppress visibility even if Google deletion fails
+        try {
+          if (userId && googleEventIdToDelete) {
+            if (req.user?.role === 'DEPT_HEAD') {
+              const HeadUser = (await import('../models/HeadUser.js')).default;
+              await HeadUser.updateOne(
+                { _id: userId },
+                { $addToSet: { hiddenGoogleEventIds: googleEventIdToDelete } }
+              );
+            } else {
+              const { getOfficerUserModel } = await import('../models/User.js');
+              const OfficerUser = getOfficerUserModel();
+              await OfficerUser.updateOne(
+                { _id: userId },
+                { $addToSet: { hiddenGoogleEventIds: googleEventIdToDelete } }
+              );
+            }
+            appliedHidden = true;
+          }
+        } catch (_) {}
+        // Continue with database cleanup even if Google Calendar deletion fails
       }
     }
-    
-    // Delete from database
-    // If we found the event earlier, use its _id directly for most reliable deletion
-    if (dbEvent && dbEvent._id) {
-      try {
-        console.log(`Deleting event from database using found _id: ${dbEvent._id}`);
-        const deleteResult = await Event.deleteOne({ _id: dbEvent._id });
-        console.log(`Delete result:`, deleteResult);
-        deletedFromDatabase = deleteResult.deletedCount > 0;
-        if (deletedFromDatabase) {
-          console.log(`✅ Successfully deleted event ${dbEvent._id} from database`);
+  }
+  
+  // Delete from database
+  // If we found the event earlier, use its _id directly for most reliable deletion
+  if (dbEvent && dbEvent._id) {
+    try {
+        if (deletedFromGoogle || !appliedHidden) {
+          console.log(`Deleting event from database using found _id: ${dbEvent._id}`);
+          const deleteResult = await Event.deleteOne({ _id: dbEvent._id });
+          console.log(`Delete result:`, deleteResult);
+          deletedFromDatabase = deleteResult.deletedCount > 0;
+          if (deletedFromDatabase) {
+            console.log(`✅ Successfully deleted event ${dbEvent._id} from database`);
+          } else {
+            console.warn(`⚠️ Event ${dbEvent._id} not found for deletion (may have been already deleted)`);
+          }
         } else {
-          console.warn(`⚠️ Event ${dbEvent._id} not found for deletion (may have been already deleted)`);
+          await Event.updateOne({ _id: dbEvent._id }, { $set: { hidden: true } });
+          deletedFromDatabase = true;
         }
-      } catch (dbError) {
-        console.error('❌ Error deleting event from database by _id:', dbError);
-        throw dbError;
-      }
-    } else {
+    } catch (dbError) {
+      console.error('❌ Error deleting event from database by _id:', dbError);
+      throw dbError;
+    }
+  } else {
       // Fallback: try to delete using googleEventId or possibleDbId
       const deleteConditions = [];
       if (googleEventIdToDelete) {
@@ -405,7 +462,12 @@ export async function remove(req, res, next) {
           }
 
           if (!deletedFromDatabase) {
-            console.warn(`⚠️ Event not found in database for deletion. Conditions:`, deleteConditions);
+            if (appliedHidden) {
+              console.warn(`⚠️ Event not found in database; applied hidden suppression`);
+              deletedFromDatabase = true;
+            } else {
+              console.warn(`⚠️ Event not found in database for deletion. Conditions:`, deleteConditions);
+            }
           } else {
             console.log(`✅ Successfully deleted event from database`);
           }
@@ -574,6 +636,46 @@ export async function pushToGoogleCalendar(req, res, next) {
   } catch (err) {
     console.error('Push to Google Calendar error:', err);
     res.status(500).json({ error: 'Failed to push events to Google Calendar: ' + err.message });
+  }
+}
+
+// Delete Google events that are not present in our database for the user within a time range
+export async function pruneGoogleToDatabase(req, res, next) {
+  try {
+    const cid = await getCalendarId(req);
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const { timeMin, timeMax } = req.body || {};
+    const now = new Date();
+    const defaultMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const defaultMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
+    const range = { timeMin: timeMin || defaultMin, timeMax: timeMax || defaultMax };
+
+    const googleEvents = await listEvents(cid, range);
+    const dbEvents = await Event.find({ user: userId, googleEventId: { $exists: true, $ne: null } }).select('googleEventId').lean();
+    const dbIds = new Set(dbEvents.map(e => e.googleEventId).filter(Boolean));
+
+    let deleted = 0;
+    const errors = [];
+    for (const ge of (googleEvents || [])) {
+      const gid = ge.id;
+      if (!gid) continue;
+      if (!dbIds.has(gid)) {
+        try {
+          await gcalDelete(cid, gid);
+          deleted += 1;
+        } catch (err) {
+          errors.push({ id: gid, message: err.message, status: err.response?.status });
+        }
+      }
+    }
+
+    res.json({ ok: true, deleted, errors });
+  } catch (err) {
+    console.error('Prune error:', err);
+    res.status(500).json({ error: 'Failed to prune Google events', message: err.message });
   }
 }
 
