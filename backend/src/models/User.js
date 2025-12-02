@@ -22,6 +22,21 @@ UserSchema.add({
   archivedAt: { type: Date, default: null }
 });
 
+// RBAC permissions for OFFICER accounts
+UserSchema.add({
+  permissions: {
+    type: Object,
+    default: {
+      validateRequirements: false,
+      editProfiles: false,
+      processEnrollment: false,
+      manageSchedule: false,
+      generateReports: false,
+      viewRecordsAllPrograms: false
+    }
+  }
+});
+
 let _model;
 export function getOfficerUserModel() {
   if (!_model) {

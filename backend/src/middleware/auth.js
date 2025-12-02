@@ -1,6 +1,7 @@
 // In backend/src/middleware/auth.js
 import jwt from 'jsonwebtoken';
 import { unauthorized, forbidden } from '../utils/errors.js';
+import { getOfficerUserModel } from '../models/User.js';
 
 export const auth = async (req, res, next) => {
   try {
@@ -62,3 +63,22 @@ export const requireAnyRole = (...roles) => {
     next();
   };
 };
+
+export const requireOfficerPermission = (perm) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) return next(unauthorized('Invalid token'))
+      if (req.user.role !== 'OFFICER') return next()
+      const User = getOfficerUserModel();
+      const u = await User.findById(req.user.id).lean();
+      const ok = !!(u && u.permissions && u.permissions[perm]);
+      if (!ok) {
+        console.log(`Permission denied: officer ${req.user.id} lacks ${perm}`);
+        return next(forbidden('Forbidden'));
+      }
+      next();
+    } catch (e) {
+      next(unauthorized('Invalid token'))
+    }
+  }
+}

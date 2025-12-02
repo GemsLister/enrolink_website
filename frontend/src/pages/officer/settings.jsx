@@ -33,6 +33,7 @@ export default function OfficerSettings() {
       setSavingProfile(true); setErr(''); setMsg('')
       const res = await api.put('/auth/officer/me', { name: profile.name })
       setProfile(p => ({ ...p, name: res.user?.name || p.name }))
+      try { localStorage.setItem('userProfile', JSON.stringify(res.user || { name: profile.name, email: profile.email, role: 'OFFICER' })) } catch (_) {}
       setMsg('Personal information updated')
     } catch (e) { setErr(e.message) } finally { setSavingProfile(false) }
   }
