@@ -34,6 +34,10 @@ const eventSchema = new mongoose.Schema({
   googleEventId: {
     type: String,
     index: true
+  },
+  hidden: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

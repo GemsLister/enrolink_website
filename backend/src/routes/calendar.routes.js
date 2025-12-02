@@ -29,6 +29,7 @@ router.patch('/events/:id', auth, ctrl.update);
 router.delete('/events/:id', auth, ctrl.remove);
 router.post('/sync', auth, ctrl.syncCalendar); // Sync FROM Google Calendar to database
 router.post('/push', auth, ctrl.pushToGoogleCalendar); // Push database events TO Google Calendar
+router.delete('/prune', auth, ctrl.pruneGoogleToDatabase); // Delete Google events not in DB for user
 router.get('/calendars', auth, ctrl.listAvailableCalendars); // List all available calendars
 router.get('/test', auth, ctrl.testAccess); // Test calendar access
 

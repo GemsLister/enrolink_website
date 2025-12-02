@@ -60,6 +60,9 @@ export default function OfficerDashboard() {
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
   const [assignedLabel, setAssignedLabel] = useState('')
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archiveConfirmIds, setArchiveConfirmIds] = useState([])
+  const [archiveConfirmLoading, setArchiveConfirmLoading] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -211,27 +214,33 @@ export default function OfficerDashboard() {
     setCalendarRefreshKey((prev) => prev + 1)
   }
 
-  async function deleteSchedule(id) {
-    if (!token || !id) return
-    try {
-      await api.calendarDelete(token, id)
-      setSelectedScheduleIds((prev) => prev.filter((item) => item !== id))
-      await refreshCalendar()
-    } catch (e) {
-      setError(e.message || 'Failed to delete schedule')
-    }
-  }
 
   async function deleteSelectedSchedules() {
     if (!token || !selectedScheduleIds.length) return
-    const confirmed = window.confirm(`Delete ${selectedScheduleIds.length} selected schedule${selectedScheduleIds.length > 1 ? 's' : ''}? This cannot be undone.`)
-    if (!confirmed) return
+    openArchiveConfirm(selectedScheduleIds)
+  }
 
+  const openArchiveConfirm = (ids) => {
+    const list = Array.isArray(ids) ? ids.filter(Boolean) : []
+    if (!list.length) return
+    setArchiveConfirmIds(list)
+    setArchiveConfirmOpen(true)
+  }
+
+  const closeArchiveConfirm = () => {
+    setArchiveConfirmOpen(false)
+    setArchiveConfirmIds([])
+    setArchiveConfirmLoading(false)
+  }
+
+  const confirmArchive = async () => {
+    if (!token || !archiveConfirmIds.length) { closeArchiveConfirm(); return }
     setBulkDeleting(true)
+    setArchiveConfirmLoading(true)
     setError('')
     try {
       await Promise.all(
-        selectedScheduleIds.map((id) =>
+        archiveConfirmIds.map((id) =>
           api.calendarDelete(token, id).catch((err) => {
             console.error('Failed to delete schedule', id, err)
             throw err
@@ -244,7 +253,9 @@ export default function OfficerDashboard() {
       console.error('Bulk delete failed:', err)
       setError(err.message || 'Failed to delete selected schedules')
     } finally {
+      setArchiveConfirmLoading(false)
       setBulkDeleting(false)
+      closeArchiveConfirm()
     }
   }
 
@@ -302,7 +313,7 @@ export default function OfficerDashboard() {
                   <QuickChart
                     type="BarChart"
                     className="mt-4"
-                    style={{ width: '100%', height: 'auto' }}
+                    style={{ width: '70%', height: 360 }}
                     data={data}
                     options={{
                       backgroundColor: 'transparent',
@@ -319,7 +330,7 @@ export default function OfficerDashboard() {
               <QuickChart
                 type="PieChart"
                 className="mt-4"
-                style={{ width: '100%', height: 'auto' }}
+                style={{ width: '70%', height: 360 }}
                 data={[ ["Result", "Percent"], ["Failed", Number(passRate.failed || 0)], ["Passed", Number(passRate.passed || 0)] ]}
                 options={{
                   backgroundColor: 'transparent',
@@ -441,9 +452,9 @@ export default function OfficerDashboard() {
                 </button>
               </div>
             </div>
-            <div className="mt-4 flex flex-col gap-3 pr-2 max-h-[320px] overflow-y-auto">
-              {gcal.length === 0 && (<div className="text-sm text-[#a86a74]">No schedules.</div>)}
-              {gcal.map(ev => {
+          <div className="mt-4 flex flex-col gap-3 pr-2 max-h-[320px] overflow-y-auto">
+            {gcal.length === 0 && (<div className="text-sm text-[#a86a74]">No schedules.</div>)}
+            {gcal.map(ev => {
                 const when = ev.start?.dateTime || ev.start?.date
                 const dt = when ? new Date(when) : null
                 const isSelected = selectedScheduleIds.includes(ev.id)
@@ -465,7 +476,7 @@ export default function OfficerDashboard() {
                     </div>
                     {!ev.htmlLink && (
                       <button
-                        onClick={() => { if (window.confirm('Delete this schedule?')) deleteSchedule(ev.id) }}
+                        onClick={() => openArchiveConfirm([ev.id])}
                         className="ml-2 rounded-full border border-[#efccd2] text-[#7d102a] hover:bg-[#f8e7eb] px-3 py-1 text-xs"
                         title="Delete schedule"
                       >
@@ -476,6 +487,21 @@ export default function OfficerDashboard() {
                 )
               })}
             </div>
+            {archiveConfirmOpen && (
+              <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/30" onClick={closeArchiveConfirm} />
+                <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#f4c3c6] to-[#f3b1b7] p-6 border-2 border-[#6b2b2b] shadow-[0_35px_90px_rgba(239,150,150,0.35)]">
+                  <div className="text-center text-[#6b2b2b] font-bold text-lg mb-2">
+                    {archiveConfirmIds.length > 1 ? 'Archive these schedules?' : 'Archive this schedule?'}
+                  </div>
+                  <p className="text-center text-[#6b2b2b] text-sm">This action will remove it from active lists.</p>
+                  <div className="mt-4 flex justify-center gap-3">
+                    <button onClick={confirmArchive} disabled={archiveConfirmLoading} className="rounded-full bg-[#6b0000] text-white px-6 py-2 disabled:opacity-50">{archiveConfirmLoading ? 'Archiving…' : 'Continue'}</button>
+                    <button onClick={closeArchiveConfirm} className="rounded-full bg-white text-[#6b2b2b] border border-[#6b2b2b] px-6 py-2">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-8">
             <h2 className="text-sm font-bold text-[#7d102a]">Recent Activity</h2>

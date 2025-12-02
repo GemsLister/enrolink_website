@@ -14,7 +14,8 @@ const UserSchema = new mongoose.Schema(
     notifEmail: { type: Boolean, default: true },
     notifSms: { type: Boolean, default: false },
     notifInterview: { type: Boolean, default: true },
-    notifSystem: { type: Boolean, default: true }
+    notifSystem: { type: Boolean, default: true },
+    hiddenGoogleEventIds: { type: [String], default: [] }
   },
   { timestamps: true }
 );
