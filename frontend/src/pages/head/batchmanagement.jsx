@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
@@ -9,6 +8,7 @@ import BatchesTable from './components/BatchesTable'
 import AddBatchModal from './components/AddBatchModal'
 import ImportModal from './components/ImportModal'
 import BatchDetailsModal from './components/BatchDetailsModal'
+import UserChip from '../../components/UserChip'
 
 export default function BatchManagement({ embedded = false }) {
     const { isAuthenticated, user, token } = useAuth()
@@ -31,7 +31,7 @@ export default function BatchManagement({ embedded = false }) {
       importCreate, setImportCreate, csvFile, setCsvFile, importLoading,
       toggleRow, toggleAllDisplayed, handleDeleteSelected,
       handleRowClick, closeModal, openImportForBatch, loadMembers,
-      handleAddBatch, handleImport, submitImport, submitImportCsv,
+      handleAddBatch, submitImport, submitImportCsv,
       handleAddStudentSubmit,
       saveBatchEdits,
       updateBatchStatus,
@@ -41,30 +41,21 @@ export default function BatchManagement({ embedded = false }) {
   if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
 
     // When routed to /head/batch-management/:id, show page without opening edit modal
-    useEffect(() => {
-      // No-op: avoid auto-opening modal; navigation handles URL state
-    }, [routeBatchId, batches])
 
     const content = (
       <>
-        <div className={`flex-1 bg-[#f7f1f2] px-10 py-8 overflow-y-auto ${embedded ? '' : 'h-[100dvh]'}`}>
-                <div className="flex justify-between items-start mb-8">
-                    <div>
-                        <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">MANAGE BATCH</h1>
-                        <p className="text-md text-[#2f2b33] mt-3">List of Batches</p>
-                    </div>
-
-                    <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-15 flex items-center gap-3 mt-[-50px]">
-                        <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                        </svg>
-                        <span className="text-gray-800 font-medium">Santiago Garcia</span>
-                        <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                    </div>
-                </div>
-                <BatchFilters
+        <main className={`flex-1 h-[100dvh] bg-[#fff6f7] overflow-hidden ${embedded ? '' : ''}`}>
+          <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
+            <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="uppercase tracking-[0.25em] text-sm text-[#5b1a30]">Records</div>
+                <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Batch Management</h1>
+                <p className="text-base text-[#5b1a30]">List of Batches</p>
+              </div>
+              <UserChip />
+            </div>
+            <BatchFilters
                   query={query}
                   setQuery={setQuery}
                   batchOptions={batchOptions}
@@ -80,7 +71,8 @@ export default function BatchManagement({ embedded = false }) {
                   handleDeleteSelected={handleDeleteSelected}
                   handleAddBatch={handleAddBatch}
                 />
-
+            <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 overflow-hidden border border-[#f7d6d6]">
+              <div className="overflow-x-auto no-scrollbar">
                 <BatchesTable
                   batchesLoading={batchesLoading}
                   displayedBatches={displayedBatches}
@@ -99,8 +91,11 @@ export default function BatchManagement({ embedded = false }) {
                   statusOptions={statusOptions}
                   onChangeStatus={(batch, label) => updateBatchStatus(batch, label)}
                 />
-        </div>
-            <AddBatchModal isOpen={isAddBatchOpen} setIsOpen={setIsAddBatchOpen} addBatchValues={addBatchValues} setAddBatchValues={setAddBatchValues} addBatchLoading={addBatchLoading} submitAddBatch={submitAddBatch} submitAddBatchAndImport={submitAddBatchAndImport} allowInterviewer={user?.role === 'DEPT_HEAD'} />
+              </div>
+            </div>
+          </div>
+        </main>
+        <AddBatchModal isOpen={isAddBatchOpen} setIsOpen={setIsAddBatchOpen} addBatchValues={addBatchValues} setAddBatchValues={setAddBatchValues} addBatchLoading={addBatchLoading} submitAddBatch={submitAddBatch} submitAddBatchAndImport={submitAddBatchAndImport} allowInterviewer={user?.role === 'DEPT_HEAD'} />
 
             <ImportModal
               isOpen={isImportOpen}
@@ -146,7 +141,7 @@ export default function BatchManagement({ embedded = false }) {
     if (embedded) return content
 
     return (
-      <div className="flex">
+      <div className="min-h-screen flex">
         <Sidebar />
         {content}
       </div>

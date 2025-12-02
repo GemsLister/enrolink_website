@@ -4,6 +4,7 @@ import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
 import { api as clientApi } from '../../api/client'
+import UserChip from '../../components/UserChip'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
@@ -36,6 +37,7 @@ const APPLICANT_COLUMNS = [
   { key: 'ethicsIntegrity', label: 'Ethics and Integrity', width: '200px' },
   { key: 'qScore', label: 'Q Score (40%) Interview Questions', width: '220px' },
   { key: 'interviewerDecision', label: 'Interviewer’s Decision', width: '200px' },
+  { key: 'pScore', label: 'P Score (30%) entrance exam', width: '220px' },
   { key: 'sScore', label: 'S Score (30%) GPA in SHS', width: '220px' },
   { key: 'finalScore', label: 'Final Score (Percentile Score, Q Score, S Score)', width: '260px' },
   { key: 'remarks', label: 'Remarks', width: '200px' },
@@ -71,20 +73,20 @@ const STUDENT_COLUMNS = [
 ]
 
 const IMPORT_HEADERS_APPLICANTS = [
-  { key: 'number', label: 'no' },
+  { key: 'number', label: 'no.' },
   { key: 'course', label: 'course' },
-  { key: 'examineeNo', label: 'examinee_no' },
+  { key: 'examineeNo', label: 'examinee no.' },
   { key: 'source', label: 'source' },
   { key: 'lastName', label: 'lastname' },
   { key: 'firstName', label: 'firstname' },
-  { key: 'middleName', label: 'middle_name' },
+  { key: 'middleName', label: 'middle name' },
   { key: 'email', label: 'email' },
   { key: 'percentileScore', label: 'percentile' },
   { key: 'shsStrand', label: 'strand' },
   { key: 'shs', label: 'shs' },
   { key: 'contact', label: 'contact' },
   { key: 'shsGpa', label: 'shs_gpa' },
-  { key: 'interviewDate', label: 'interview_date' },
+  { key: 'interviewDate', label: 'interview date' },
   { key: 'academicTechnicalBackground', label: 'rating_academic' },
   { key: 'skillsCompetencies', label: 'rating_skills' },
   { key: 'timeManagement', label: 'rating_teamwork' },
@@ -94,7 +96,7 @@ const IMPORT_HEADERS_APPLICANTS = [
   { key: 'qScore', label: 'q_score' },
   { key: 'interviewerDecision', label: 'decision' },
   { key: 'sScore', label: 's_score' },
-  { key: 'finalScore', label: 'final_score' },
+  { key: 'finalScore', label: 'final score' },
   { key: 'remarks', label: 'remarks' },
 ]
 
@@ -130,7 +132,7 @@ const RATING_COLUMN_KEYS = new Set([
   'problemSolving',
   'ethicsIntegrity',
 ])
-const PERCENTAGE_COLUMN_KEYS = new Set(['percentileScore', 'qScore', 'sScore', 'finalScore'])
+const PERCENTAGE_COLUMN_KEYS = new Set(['percentileScore', 'pScore', 'qScore', 'sScore', 'finalScore'])
 const CATEGORY_OPTIONS = ['Applicant', 'Enrollee', 'Student']
 const SHS_STRAND_OPTIONS = ['STEM', 'ABM', 'HUMSS', 'TVL-ICT']
 const DECISION_OPTIONS = ['PASSED', 'FAILED', 'NO RESULT']
@@ -199,6 +201,35 @@ const titleCase = (value) => {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ')
+}
+
+const formatPercent = (value) => {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const num = Number(raw.replace(/%$/, ''))
+  if (!Number.isFinite(num)) return raw.endsWith('%') ? raw : `${raw}%`
+  return `${num.toFixed(2)}%`
+}
+
+const toNumber = (value) => {
+  const raw = String(value ?? '').trim()
+  const num = Number(raw.replace(/%$/, ''))
+  return Number.isFinite(num) ? num : 0
+}
+
+const computeQPercent = (src) => {
+  const k = ['academicTechnicalBackground','skillsCompetencies','timeManagement','communicationSkills','problemSolving','ethicsIntegrity']
+  const sum = k.reduce((acc, key) => acc + toNumber(src?.[key]), 0)
+  const pct = (sum / 30) * 100
+  return Number.isFinite(pct) ? pct : 0
+}
+
+const computeFinalPercent = (src) => {
+  const q = computeQPercent(src)
+  const p = toNumber(src?.percentileScore)
+  const s = toNumber(src?.shsGpa)
+  const final = (q * 0.4) + (p * 0.3) + (s * 0.3)
+  return Number.isFinite(final) ? final : 0
 }
 
 const normalizeText = (value, type) => {
@@ -270,7 +301,8 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
 
   const header = rawRows[0].map((cell) => normalizeText(cell).toLowerCase())
   const expectedHeaders = importHeaders.map((h) => h.label)
-  const isValid = expectedHeaders.every((label, index) => header[index] === label)
+  const headerMap = Object.fromEntries(header.map((h, i) => [h, i]))
+  const isValid = expectedHeaders.every((label) => headerMap[label] !== undefined)
   if (!isValid) {
     throw new Error('Column headers do not match the required template.')
   }
@@ -280,8 +312,9 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
   return dataRows
     .map((row) => {
       if (!row || row.every((cell) => normalizeText(cell) === '')) return null
-      const record = importHeaders.reduce((acc, column, idx) => {
-        const rawValue = row[idx]
+      const record = importHeaders.reduce((acc, column) => {
+        const idx = headerMap[column.label]
+        const rawValue = idx !== undefined ? row[idx] : ''
         if (column.key === 'course') {
           const normalized = normalizeText(rawValue).toUpperCase()
           acc[column.key] = normalized === 'BSIT' || normalized === 'BSEMC-DAT' ? normalized : ''
@@ -307,6 +340,9 @@ const parseXlsx = async (file, forcedCategory, importHeaders, { dateFormat = 'lo
       } else if (!record.recordCategory) {
         record.recordCategory = 'Applicant'
       }
+      record.qScore = computeQPercent(record)
+      record.finalScore = computeFinalPercent(record)
+      if (!record.sScore) record.sScore = record.shsGpa || ''
       return record
     })
     .filter(Boolean)
@@ -379,6 +415,7 @@ export function RecordsOverviewContent({ basePath }) {
 
 export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const api = useApi(token)
+  const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
@@ -440,6 +477,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [exportOrientation, setExportOrientation] = useState('landscape')
   const [exportPaperSize, setExportPaperSize] = useState('A4')
   const [selectedRows, setSelectedRows] = useState([])
+  const [confirmArchiveIds, setConfirmArchiveIds] = useState([])
   
 
   const isArchiveView = view === 'archive'
@@ -505,10 +543,16 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     }
     if (key === 'actions') return null
     if (key === 'number') {
+      const nums = Array.from(new Set((filteredRows || rows || [])
+        .map((r) => Number(r?.number))
+        .filter((n) => Number.isFinite(n))
+      )).sort((a, b) => a - b)
+      const numberOptions = nums.map((n) => ({ value: `eq:${n}`, label: String(n) }))
       return [
         { value: 'asc', label: 'Ascending' },
         { value: 'desc', label: 'Descending' },
         { value: 'waitlist', label: 'WAITLIST' },
+        ...numberOptions,
       ]
     }
     if (key === 'course') {
@@ -607,7 +651,22 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           const bVal = bRow[key]
           let comparison = 0
           
-          if (key === 'number' && direction === 'waitlist') {
+          if (key === 'number' && typeof direction === 'string' && direction.startsWith('eq:')) {
+            const target = Number(direction.slice(3))
+            const aNum = Number(aVal)
+            const bNum = Number(bVal)
+            const aMatch = Number.isFinite(aNum) && aNum === target
+            const bMatch = Number.isFinite(bNum) && bNum === target
+            if (aMatch !== bMatch) {
+              comparison = aMatch ? -1 : 1
+            } else if (aMatch && bMatch) {
+              comparison = 0
+            } else {
+              // fallback: keep existing ordering or group non-matches by asc number
+              if (Number.isFinite(aNum) && Number.isFinite(bNum)) comparison = aNum - bNum
+              else comparison = compareString(String(aVal ?? ''), String(bVal ?? ''))
+            }
+          } else if (key === 'number' && direction === 'waitlist') {
             const aIs = String(aVal || '').toUpperCase() === 'WAITLIST'
             const bIs = String(bVal || '').toUpperCase() === 'WAITLIST'
             if (aIs !== bIs) {
@@ -716,6 +775,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             else if (bIdx === 1) comparison = 1
             else comparison = aIdx - bIdx
           }
+          } else if (RATING_COLUMN_KEYS.has(key)) {
+            const aNum = Number(aVal)
+            const bNum = Number(bVal)
+            if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+              comparison = direction === 'asc' ? aNum - bNum : bNum - aNum
+            } else {
+              comparison = compareString(String(aVal ?? ''), String(bVal ?? ''))
+              comparison = direction === 'asc' ? comparison : -comparison
+            }
           } else if (key === 'number') {
             const aNum = Number(aVal)
             const bNum = Number(bVal)
@@ -779,6 +847,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }
   const clearSelection = () => setSelectedRows([])
 
+  const isAwaitingArchiveConfirm = (row) => {
+    const id = getRowId(row)
+    if (!id) return false
+    return confirmArchiveIds.includes(id)
+  }
+
+  const toggleArchiveConfirm = (row) => {
+    const id = getRowId(row)
+    if (!id) return
+    if (confirmArchiveIds.includes(id)) {
+      setConfirmArchiveIds((prev) => prev.filter((x) => x !== id))
+    } else {
+      setConfirmArchiveIds((prev) => [...prev, id])
+    }
+  }
+
+  useEffect(() => {
+    const onDocClick = () => setConfirmArchiveIds([])
+    document.addEventListener('click', onDocClick)
+    return () => {
+      document.removeEventListener('click', onDocClick)
+    }
+  }, [])
+
   const cancelEditing = useCallback(() => {
     if (!editingId) return
     if (editingMeta?.isNew && editingMeta?.clientId) {
@@ -829,6 +921,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       return
     }
     const payload = { ...editingValues }
+    if (currentCategory === 'Enrollee') {
+      const status = normalizeText(payload.enrollmentStatus).toUpperCase()
+      payload.enrollmentStatus = ENROLLMENT_STATUS_OPTIONS.includes(status) ? status : 'PENDING'
+    } else {
+      delete payload.enrollmentStatus
+    }
+    payload.qScore = computeQPercent(payload)
+    payload.finalScore = computeFinalPercent(payload)
+    if (!payload.sScore) payload.sScore = payload.shsGpa || ''
     if (editingMeta?.id) {
       payload.id = editingMeta.id
       if (editingMeta?.__v !== undefined) payload.__v = editingMeta.__v
@@ -870,12 +971,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const handler = (event) => {
       if (!editingRowRef.current) return
       if (!editingRowRef.current.contains(event.target)) {
-        void saveEditing()
+        cancelEditing()
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [editingId, saveEditing])
+  }, [editingId, cancelEditing])
 
   useEffect(() => {
     if (!editingId) restoreScroll()
@@ -906,6 +1007,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     cancelEditing()
     const clientId = `temp-${Date.now()}`
     const freshRow = { ...EMPTY_RECORD, recordCategory: currentCategory, __clientId: clientId }
+    if (currentCategory === 'Enrollee') freshRow.enrollmentStatus = 'PENDING'
     setRows((prev) => [freshRow, ...prev.filter((row) => !row.__clientId)])
     beginEditing(freshRow, { isNew: true })
   }
@@ -986,6 +1088,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const formatCell = (key, val) => {
       if (['firstName', 'middleName', 'lastName'].includes(key)) return normalizeText(val, 'name') || ''
       if (isStudentView && key === 'interviewDate') return normalizeDate(val, 'short') || ''
+      if (PERCENTAGE_COLUMN_KEYS.has(key) || key === 'pScore') return formatPercent(val)
       return String(val ?? '')
     }
 
@@ -1006,7 +1109,14 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     y += 8
 
     const headAll = selectedCols.map((c) => findLabel(c.key))
-    const bodyAll = data.map((row) => selectedCols.map((c) => formatCell(c.key, row[c.key])))
+    const bodyAll = data.map((row) => selectedCols.map((c) => {
+      const key = c.key
+      if (key === 'pScore') return formatCell(key, row.percentileScore)
+      if (key === 'sScore') return formatCell(key, row.shsGpa)
+      if (key === 'qScore') return formatCell(key, computeQPercent(row))
+      if (key === 'finalScore') return formatCell(key, computeFinalPercent(row))
+      return formatCell(key, row[key])
+    }))
 
     autoTable(doc, {
       head: [headAll],
@@ -1044,9 +1154,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       payload.archived_at = new Date().toISOString()
       await api.post('/students', payload)
       setBanner({ type: 'success', message: 'Archived successfully.' })
-      const key = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
-      navigate(`${basePath}/archive?type=${encodeURIComponent(key)}`)
       await fetchRows()
+      const id = getRowId(row)
+      if (id) setConfirmArchiveIds((prev) => prev.filter((x) => x !== id))
     } catch (e) {
       setBanner({ type: 'error', message: e.message || 'Failed to archive.' })
     }
@@ -1067,16 +1177,22 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     }
   }
 
-  const handleDelete = async (row) => {
+  const handleInlineStatusChange = async (row, next) => {
     try {
-      if (!row._id) return
-      await api.delete(`/students/${row._id}`)
-      setBanner({ type: 'success', message: 'Deleted permanently.' })
+      const payload = {}
+      ALL_COLUMN_KEYS.forEach((k) => { payload[k] = row[k] ?? '' })
+      if (row._id) payload.id = row._id
+      if (row.__v !== undefined) payload.__v = row.__v
+      payload.recordCategory = next
+      await api.post('/students', payload)
+      setBanner({ type: 'success', message: 'Status updated.' })
       await fetchRows()
     } catch (e) {
-      setBanner({ type: 'error', message: e.message || 'Failed to delete.' })
+      setBanner({ type: 'error', message: e.message || 'Failed to update status.' })
     }
   }
+
+  
 
   useEffect(() => {
     if (isArchiveView) {
@@ -1093,7 +1209,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
         <div className="flex flex-col gap-6">
           <div className="space-y-2">
-            <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+            <div className="flex items-center justify-between">
+              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+              <UserChip />
+            </div>
             <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
             <p className="text-base text-[#8b4a5d] max-w-3xl">{headerSubtitle}</p>
             <div className="w-full max-w-sm mt-2">
@@ -1194,7 +1313,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
           <div ref={tableScrollRef} onScroll={handleTableScroll} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
             <table className="min-w-[1800px] border-collapse">
               <thead>
-                <tr className="bg-[#f9c4c4] text-[#5b1a30] text-sm font-semibold">
+                <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
                   <th style={{ minWidth: '60px' }} className="px-4 py-4 text-left sticky top-0 z-20 bg-[#f9c4c4]">
                     <input
                       type="checkbox"
@@ -1372,7 +1491,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   >
                                     <option value="">Select</option>
-                                    {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((rating) => (
+                                    {Array.from({ length: 5 }, (_, idx) => String(idx + 1)).map((rating) => (
                                       <option key={rating} value={rating}>
                                         {rating}
                                       </option>
@@ -1392,7 +1511,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                       </option>
                                     ))}
                                   </select>
-                                ) : PERCENTAGE_COLUMN_KEYS.has(column.key) ? (
+                                ) : (PERCENTAGE_COLUMN_KEYS.has(column.key) && !['qScore','finalScore'].includes(column.key)) ? (
                                   <input
                                     type="text"
                                     value={editingValues[column.key] ?? ''}
@@ -1438,13 +1557,32 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     </button>
                                   ) : (
                                     view !== 'archive' ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleArchive(row)}
-                                        className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200"
-                                      >
-                                        Archive
-                                      </button>
+                                      isAwaitingArchiveConfirm(row) ? (
+                                        <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleArchive(row)}
+                                            className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-semibold text-white hover:bg-yellow-700"
+                                          >
+                                            Confirm
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleArchiveConfirm(row)}
+                                            className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#6b0000] hover:bg-rose-50"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); toggleArchiveConfirm(row) }}
+                                          className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200"
+                                        >
+                                          Archive
+                                        </button>
+                                      )
                                     ) : (
                                       <>
                                         <button
@@ -1454,24 +1592,47 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                         >
                                           Restore
                                         </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDelete(row)}
-                                          className="rounded-full bg-white border border-rose-200 px-3 py-1 text-xs font-semibold text-[#c4375b] hover:border-rose-400"
-                                        >
-                                          Delete Permanently
-                                        </button>
                                       </>
                                     )
                                   )}
                                 </div>
-                              ) : column.key === 'recordCategory' && value ? (
-                                <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-                                  {value}
-                                </span>
+                              ) : column.key === 'recordCategory' ? (
+                                <select
+                                  value={value || currentCategory}
+                                  onChange={(event) => handleInlineStatusChange(row, event.target.value)}
+                                  className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
+                                >
+                                  {CATEGORY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
                               ) : (
                                 <span>
                                   {(() => {
+                                    if (column.key === 'qScore') {
+                                      const src = isEditing ? editingValues : row
+                                      const formatted = formatPercent(computeQPercent(src))
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'finalScore') {
+                                      const src = isEditing ? editingValues : row
+                                      const formatted = formatPercent(computeFinalPercent(src))
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'pScore') {
+                                      const src = isEditing ? editingValues.percentileScore : row.percentileScore
+                                      const formatted = formatPercent(src)
+                                      return formatted || '—'
+                                    }
+                                    if (column.key === 'sScore') {
+                                      const src = isEditing ? editingValues.shsGpa : row.shsGpa
+                                      const formatted = formatPercent(src)
+                                      return formatted || '—'
+                                    }
+                                    if (PERCENTAGE_COLUMN_KEYS.has(column.key)) {
+                                      const formatted = formatPercent(value)
+                                      return formatted || '—'
+                                    }
                                     if (['firstName', 'middleName', 'lastName'].includes(column.key)) {
                                       return normalizeText(value, 'name') || '—'
                                     }
@@ -1506,18 +1667,20 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                 Clear sort
               </button>
               <div className="border-t border-rose-50" />
-              {(getSortOptions(sortMenuKey) || []).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
-                    (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
-                  }`}
-                  onClick={() => handleSortChange(sortMenuKey, option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
+              <div className={sortMenuKey === 'number' ? 'max-h-64 overflow-y-auto' : ''}>
+                {(getSortOptions(sortMenuKey) || []).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
+                      (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
+                    }`}
+                    onClick={() => handleSortChange(sortMenuKey, option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
