@@ -94,6 +94,7 @@ const IMPORT_HEADERS_APPLICANTS = [
   { key: 'ethicsIntegrity', label: 'rating_ethics' },
   { key: 'qScore', label: 'q_score' },
   { key: 'interviewerDecision', label: 'decision' },
+  { key: 'pScore', label: 'p score (30%) entrance exam' },
   { key: 'sScore', label: 's_score' },
   { key: 'finalScore', label: 'final score' },
   { key: 'remarks', label: 'remarks' },
@@ -1817,7 +1818,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                     <>
                       <p>• Source must be WAITLIST, PRIORITY, or VVIP</p>
                       <p>• Interview Date format: MM/DD/YYYY (e.g., 12/09/2004)</p>
-                      <p>• Percentile Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
+                      <p>• Percentile Score, P Score, Q Score, S Score, and Final Score can include decimals and % symbol (e.g., 99.20%)</p>
                       <p>• Rating columns (1-10): rating_academic, rating_skills, rating_teamwork, rating_comm, rating_problem, rating_ethics</p>
                       <p>• SHS Strand: STEM, ABM, HUMSS, or TVL-ICT (or custom text)</p>
                       <p>• Interviewer’s Decision: PASSED, FAILED, or NO RESULT</p>

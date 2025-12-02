@@ -368,18 +368,19 @@ export function useBatchManagement(token, opts = {}) {
         const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) || []
-        let lnIdx = 0, fnIdx = 1, stIdx = 2, emIdx = -1, ctIdx = -1, dtIdx = -1, exIdx = -1
+        let lnIdx = 0, fnIdx = 1, stIdx = 2, emIdx = -1, ctIdx = -1, dtIdx = -1, exIdx = -1, mnIdx = -1
         if (rows.length > 0) {
           const hdr = (rows[0] || []).map(x => (x ?? '').toString().trim().toLowerCase())
           const hset = hdr.join(' ')
           if (hset.includes('last') && hset.includes('first')) {
             lnIdx = hdr.findIndex(h => h === 'lastname' || h === 'last name' || h === 'last')
             fnIdx = hdr.findIndex(h => h === 'firstname' || h === 'first name' || h === 'first')
+            mnIdx = hdr.findIndex(h => h === 'middlename' || h === 'middle name' || h === 'mi')
             stIdx = hdr.findIndex(h => h === 'status')
-            emIdx = hdr.findIndex(h => h === 'email' || h === 'e-mail')
+            emIdx = hdr.findIndex(h => h === 'email' || h === 'e-mail' || h === 'gmail')
             ctIdx = hdr.findIndex(h => h === 'contact' || h === 'phone' || h === 'contact number' || h === 'mobile')
             dtIdx = hdr.findIndex(h => h === 'interview date' || h === 'interviewdate' || h === 'date')
-            exIdx = hdr.findIndex(h => h === 'exam score' || h === 'examscore' || h === 'score')
+            exIdx = hdr.findIndex(h => h === 'exam score' || h === 'examscore' || h === 'score' || h === 'exam score (%)' || h === 'p score (30%) entrance exam')
             if (lnIdx === -1) lnIdx = 0
             if (fnIdx === -1) fnIdx = 1
             if (stIdx === -1) stIdx = 2
@@ -424,7 +425,8 @@ export function useBatchManagement(token, opts = {}) {
           let interviewDate = dtIdx >= 0 ? normalizeDate(r[dtIdx]) : ''
           const examScoreRaw = exIdx >= 0 ? (arr[exIdx] || '') : ''
           if (!firstName || !lastName) continue
-          const payload = { firstName, lastName, status: toApiStatus(statusRaw || 'Pending'), batch: year, batchId, interviewer, ...(email ? { email } : {}), ...(contact ? { contact } : {}), ...(interviewDate ? { interviewDate } : {}) }
+          const middleName = mnIdx >= 0 ? (arr[mnIdx] || '') : ''
+          const payload = { firstName, lastName, ...(middleName ? { middleName } : {}), status: toApiStatus(statusRaw || 'Pending'), batch: year, batchId, interviewer, ...(email ? { email } : {}), ...(contact ? { contact } : {}), ...(interviewDate ? { interviewDate } : {}) }
           try {
             await api.post('/students', payload)
             // Upsert exam score to reports
@@ -445,18 +447,22 @@ export function useBatchManagement(token, opts = {}) {
         const text = await csvFile.text()
         const lines = text.split(/\r?\n/).filter(Boolean)
         // Initialize all indices including Interview Date (dtIdx)
-        let lnIdx = 0, fnIdx = 1, stIdx = 2, emIdx = -1, ctIdx = -1, dtIdx = -1
+        let lnIdx = 0, fnIdx = 1, stIdx = 2, emIdx = -1, ctIdx = -1, dtIdx = -1, mnIdx = -1
+        let hdrParts = []
+        let exPos = -1
         if (lines.length) {
-          const hdrParts = lines[0].split(',').map(s => s.trim().toLowerCase())
+          hdrParts = lines[0].split(',').map(s => s.trim().toLowerCase())
           const hset = hdrParts.join(' ')
           if (hset.includes('last') && hset.includes('first')) {
             lnIdx = hdrParts.findIndex(h => h === 'lastname' || h === 'last name' || h === 'last')
             fnIdx = hdrParts.findIndex(h => h === 'firstname' || h === 'first name' || h === 'first')
             stIdx = hdrParts.findIndex(h => h === 'status')
-            emIdx = hdrParts.findIndex(h => h === 'email' || h === 'e-mail')
+            mnIdx = hdrParts.findIndex(h => h === 'middlename' || h === 'middle name' || h === 'mi')
+            emIdx = hdrParts.findIndex(h => h === 'email' || h === 'e-mail' || h === 'gmail')
             // Accept more variations for contact header, including 'contact #' and common abbreviations
             ctIdx = hdrParts.findIndex(h => h === 'contact' || h === 'phone' || h === 'contact number' || h === 'mobile' || h === 'contact #' || h === 'contact no' || h === 'contact no.')
             dtIdx = hdrParts.findIndex(h => h === 'interview date' || h === 'interviewdate' || h === 'date')
+            exPos = hdrParts.findIndex(h => h === 'exam score' || h === 'examscore' || h === 'score' || h === 'exam score (%)' || h === 'p score (30%) entrance exam')
             if (lnIdx === -1) lnIdx = 0
             if (fnIdx === -1) fnIdx = 1
             if (stIdx === -1) stIdx = 2
@@ -488,19 +494,10 @@ export function useBatchManagement(token, opts = {}) {
           const email = emIdx >= 0 ? (parts[emIdx] || '') : ''
           const contact = ctIdx >= 0 ? (parts[ctIdx] || '') : ''
           let interviewDate = dtIdx >= 0 ? normalizeDate(parts[dtIdx] || '') : ''
-          const examScoreRaw = (() => {
-            // Try to detect Exam Score column if present
-            const exPos = (() => {
-              const header = (lines[0] || '').toLowerCase()
-              const partsH = header.split(',').map(s => s.trim())
-              const idx = partsH.findIndex(h => h === 'exam score' || h === 'examscore' || h === 'score')
-              return idx
-            })()
-            if (exPos >= 0) return parts[exPos] || ''
-            return ''
-          })()
+          const examScoreRaw = exPos >= 0 ? (parts[exPos] || '') : ''
           if (!firstName || !lastName) continue
-          const payload = { firstName, lastName, status: toApiStatus(statusRaw || 'Pending'), batch: year, batchId, interviewer, ...(email ? { email } : {}), ...(contact ? { contact } : {}), ...(interviewDate ? { interviewDate } : {}) }
+          const middleName = mnIdx >= 0 ? (parts[mnIdx] || '') : ''
+          const payload = { firstName, lastName, ...(middleName ? { middleName } : {}), status: toApiStatus(statusRaw || 'Pending'), batch: year, batchId, interviewer, ...(email ? { email } : {}), ...(contact ? { contact } : {}), ...(interviewDate ? { interviewDate } : {}) }
           try {
             await api.post('/students', payload)
             // Upsert exam score to reports

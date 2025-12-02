@@ -1,9 +1,13 @@
-import { Link } from 'react-router-dom'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
 import EnroLinkLogo from '../assets/enrolink-logo 2.png'
 
 export default function OfficerSidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+  const [showLogout, setShowLogout] = useState(false)
 
   const tabs = [
     {
@@ -63,13 +67,28 @@ export default function OfficerSidebar() {
       </nav>
 
       <div className="p-8">
-        <Link to="/" className="flex items-center gap-3 px-4 py-3 rounded-full text-pink-800 hover:bg-pink-200 transition-all duration-200">
+        <a href="#" onClick={(e)=>{e.preventDefault(); setShowLogout(true)}} className="flex items-center gap-3 px-4 py-3 rounded-full text-pink-800 hover:bg-pink-200 transition-all duration-200">
           <svg className="w-5 h-5 text-pink-800" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
           </svg>
           <span className="font-medium text-sm">Log out</span>
-        </Link>
+        </a>
       </div>
+
+      {showLogout && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[460px] p-7 mx-auto border-2 border-[#6b2b2b]">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Log out?</h2>
+              <p className="text-sm text-[#7c3a4a] mt-1">You will be returned to the login page.</p>
+            </div>
+            <div className="flex gap-4 justify-center mt-6">
+              <button onClick={()=>setShowLogout(false)} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 text-sm">Cancel</button>
+              <button onClick={()=>{ setShowLogout(false); logout(); navigate('/login'); }} className="bg-[#6b0000] text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 text-sm">Log out</button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }
