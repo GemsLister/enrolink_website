@@ -92,7 +92,9 @@ export default function Dashboard() {
   const [itConfirmedCounts, setItConfirmedCounts] = useState([]);
   const [includeAllInterviewees, setIncludeAllInterviewees] = useState(true);
   const [courseFilter, setCourseFilter] = useState('IT');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem('head_active_tab') || 'overview' } catch { return 'overview' }
+  });
   const [showNotifications, setShowNotifications] = useState(false);
   const [emcRowsAll, setEmcRowsAll] = useState([]);
   const [itRowsAll, setItRowsAll] = useState([]);
@@ -193,7 +195,7 @@ export default function Dashboard() {
     async function loadLeaderboards() {
       if (!token) return;
       try {
-        const studentsRes = await api.request('GET', '/students', { token });
+        const studentsRes = await api.request('GET', '/students?recordCategory=enrollees', { token });
         const reportsRes = await api.request('GET', '/reports', { token });
         const students = Array.isArray(studentsRes?.rows) ? studentsRes.rows : [];
         const reports = Array.isArray(reportsRes?.rows) ? reportsRes.rows : [];
@@ -481,7 +483,8 @@ export default function Dashboard() {
     }
   }
 
-  const redirectTo = (!isAuthenticated ? "/login" : (!user || user.role !== "DEPT_HEAD" ? "/" : null));
+  const role = String(user?.role || '').toUpperCase()
+  const redirectTo = (!isAuthenticated ? "/login" : (role && role !== "DEPT_HEAD" ? "/officer/dashboard" : null));
 
   const totals = stats.totals || {
     totalApplicants: 0,
@@ -491,11 +494,11 @@ export default function Dashboard() {
     awol: 0,
   };
   const summaryCards = [
-    { key: 'applicants', label: "Total Applicant", value: totals.totalApplicants },
-    { key: 'interviewed', label: "Interviewed", value: totals.interviewed },
-    { key: 'enrolled_bsit', label: "Enrolled BSIT", value: bsitEnrolledCount },
-    { key: 'enrolled_bsemc', label: "Enrolled BSEMC", value: bsemcEnrolledCount },
-    { key: 'enrolled_all', label: "Enrolled All Students", value: (bsitEnrolledCount + bsemcEnrolledCount) },
+    { key: 'applicants', label: "Applicants", value: totals.totalApplicants },
+    { key: 'interviewed', label: "Interviewed Applicants", value: totals.interviewed },
+    { key: 'enrolled_bsit', label: "Enrolled — BSIT", value: bsitEnrolledCount },
+    { key: 'enrolled_bsemc', label: "Enrolled — BSEMC", value: bsemcEnrolledCount },
+    { key: 'enrolled_all', label: "Enrolled — All Programs", value: (bsitEnrolledCount + bsemcEnrolledCount) },
   ];
 
   const batches = stats.batchAnalytics || [];
@@ -512,9 +515,11 @@ export default function Dashboard() {
   }, [totals]);
   const failedInterviewCount = Math.max(0, (totals.interviewed || 0) - (totals.passedInterview || 0));
 
-  return redirectTo ? (
-    <Navigate to={redirectTo} replace />
-  ) : (
+  if (redirectTo) return <Navigate to={redirectTo} replace />
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center bg-white text-[#7d102a]">Loading…</div>
+  )
+  return (
     <div className="min-h-screen flex bg-white">
       <aside className="hidden lg:block w-80 shrink-0">
         <Sidebar />
@@ -529,9 +534,8 @@ export default function Dashboard() {
           </div>
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
           <div className="mt-4 flex gap-2">
-            <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
-            <button onClick={() => setActiveTab('analytics')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='analytics' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Analytics</button>
-            <button onClick={() => setActiveTab('leaderboards')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
+            <button onClick={() => { setActiveTab('overview'); try { localStorage.setItem('head_active_tab', 'overview') } catch {} }} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
+            <button onClick={() => { setActiveTab('leaderboards'); try { localStorage.setItem('head_active_tab', 'leaderboards') } catch {} }} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
           </div>
           {archiveConfirmOpen && (
             <div className="fixed inset-0 z-[1000] flex items-center justify-center">
@@ -549,7 +553,7 @@ export default function Dashboard() {
             </div>
           )}
           <p className="mt-3 flex items-center gap-2 text-sm text-[#6e2a39]">
-            <span>Showing for:</span>
+            <span>School Year:</span>
             <select
               value={startYear}
               onChange={(e) => setStartYear(e.target.value)}
@@ -563,7 +567,7 @@ export default function Dashboard() {
             </select>
             
             <label className="ml-4 inline-flex items-center gap-2">
-              <span>Show:</span>
+              <span>Program:</span>
               <select
                 value={courseFilter}
                 onChange={(e) => setCourseFilter(e.target.value)}
@@ -571,7 +575,7 @@ export default function Dashboard() {
               >
                 <option value="IT">BSIT</option>
                 <option value="EMC">BSEMC</option>
-                <option value="ALL">All</option>
+                <option value="ALL">All Programs</option>
               </select>
             </label>
           </p>
@@ -626,17 +630,17 @@ export default function Dashboard() {
 
           </>)}
 
-          {activeTab === 'analytics' && (
+          {activeTab === 'overview' && (
             <section className="mt-6 grid grid-cols-1 grid-rows-4 gap-3">
             {(courseFilter === 'IT') && (
               <div className="grid grid-cols-2 h-[20%] gap-8">
                 <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Interview Pass Rate</h2>
                   <div>
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: 320, height: 300 }}
+                      style={{ width: 300, height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -649,7 +653,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSIT</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Passers by SHS Strand</h2>
                   {itPassersStrandData && itPassersStrandData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -669,7 +673,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Confirmed Interviewees by Percentile</h2>
                   {itConfirmedData && itConfirmedData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -693,12 +697,12 @@ export default function Dashboard() {
             {(courseFilter === 'EMC') && (
               <div className="grid grid-cols-2 h-[20%] gap-8">
                 <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Interview Pass Rate</h2>
                   <div>
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 300 }}
+                      style={{ width: 300, height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -711,7 +715,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSEMC</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Passers by SHS Strand</h2>
                   {emcPassersStrandData && emcPassersStrandData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -731,7 +735,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Confirmed Interviewees by Percentile</h2>
                   {emcConfirmedData && emcConfirmedData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -755,12 +759,12 @@ export default function Dashboard() {
             {(courseFilter === 'ALL') && (
               <div className="grid grid-cols-2 h-[20%] gap-8">
                 <div className="flex flex-col justify-center items-center rounded-xl bg-white shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Percentage: Pass Rates</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">Interview Pass Rate</h2>
                   <div>
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 300 }}
+                      style={{ width: 300, height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -773,7 +777,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSIT</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Passers by SHS Strand</h2>
                   {itPassersStrandData && itPassersStrandData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -793,7 +797,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] w-[100%] mx-auto">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">Passers by SHS Strand - BSEMC</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Passers by SHS Strand</h2>
                   {emcPassersStrandData && emcPassersStrandData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -813,7 +817,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Population of Confirmed Interviewees</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSIT Confirmed Interviewees by Percentile</h2>
                   {itConfirmedData && itConfirmedData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -833,7 +837,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex flex-col items-center w-full rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2] lg:col-span-2">
-                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Population of Confirmed Interviewees</h2>
+                  <h2 className="text-[30px] font-bold text-[#7d102a]">BSEMC Confirmed Interviewees by Percentile</h2>
                   {emcConfirmedData && emcConfirmedData.length ? (
                     <QuickChart
                       type="BarChart"
@@ -861,7 +865,7 @@ export default function Dashboard() {
           <section className="mt-6 grid grid-cols-1 gap-6">
             {(courseFilter === 'EMC') && (
               <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSEMC (Top 60)</h2>
+                <h2 className="text-sm font-bold text-[#7d102a]">BSEMC Leaderboard (Top 60)</h2>
                 <div className="mt-4">
                   {emcTop.length === 0 ? (
                     <div className="text-sm text-[#a86a74]">No data.</div>
@@ -901,7 +905,7 @@ export default function Dashboard() {
             )}
             {(courseFilter === 'IT') && (
               <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+                <h2 className="text-sm font-bold text-[#7d102a]">BSIT Leaderboard (Top 120)</h2>
                 <div className="mt-4">
                   {itTop.length === 0 ? (
                     <div className="text-sm text-[#a86a74]">No data.</div>
@@ -978,7 +982,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="rounded-xl bg-white p-6 shadow-[0_12px_24px_rgba(139,23,47,0.08)] border border-[#efccd2]">
-                  <h2 className="text-sm font-bold text-[#7d102a]">Leaderboard: BSIT (Top 120)</h2>
+                  <h2 className="text-sm font-bold text-[#7d102a]">BSIT Leaderboard (Top 120)</h2>
                   <div className="mt-4">
                     {itTop.length === 0 ? (
                       <div className="text-sm text-[#a86a74]">No data.</div>
@@ -1078,7 +1082,7 @@ export default function Dashboard() {
                   )}
                 </button>
                 <span className="text-base font-semibold inline-flex items-center gap-2">
-                  Department Head
+                  James Lopez
                 </span>
                 <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current">
                   <path d="M5.5 7.5l4.5 5 4.5-5H5.5z" />
