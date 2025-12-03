@@ -9,5 +9,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script type="module">
+      const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID
+      if (GA_ID) {
+        window.dataLayer = window.dataLayer || []
+        function gtag(){ dataLayer.push(arguments) }
+        gtag('js', new Date())
+        gtag('config', GA_ID)
+        const s = document.createElement('script')
+        s.async = true
+        s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`
+        document.head.appendChild(s)
+      }
+    </script>
   </body>
 </html>

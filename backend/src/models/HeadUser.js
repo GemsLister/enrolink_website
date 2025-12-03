@@ -8,7 +8,14 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['DEPT_HEAD', 'OFFICER'], required: true },
     assignedBatch: { type: String },
     provider: { type: String, enum: ['local', 'google'], default: 'local' },
-    googleId: { type: String }
+    googleId: { type: String },
+    department: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    notifEmail: { type: Boolean, default: true },
+    notifSms: { type: Boolean, default: false },
+    notifInterview: { type: Boolean, default: true },
+    notifSystem: { type: Boolean, default: true },
+    hiddenGoogleEventIds: { type: [String], default: [] }
   },
   { timestamps: true }
 );

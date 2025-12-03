@@ -5,7 +5,7 @@ function getClient() {
   if (!client) {
     const cid = process.env.GOOGLE_CLIENT_ID;
     if (!cid) throw new Error('Missing GOOGLE_CLIENT_ID');
-    client = new OAuth2Client(cid);
+    client = new OAuth2Client(cid, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_REDIRECT_URI);
   }
   return client;
 }

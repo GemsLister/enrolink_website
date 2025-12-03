@@ -5,5 +5,7 @@ import { auth } from '../middleware/auth.js';
 const r = Router();
 
 r.get('/stats', auth, ctrl.stats);
+r.get('/activity', auth, ctrl.activity);
+r.post('/push-ga', auth, ctrl.pushGa);
 
 export default r;

@@ -4,6 +4,7 @@ const OfficerInviteSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, index: true },
     token: { type: String, required: true, unique: true },
+    year: { type: String },
     batch: { type: String },
     used: { type: Boolean, default: false },
     expiresAt: { type: Date, required: true }

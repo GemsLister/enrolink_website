@@ -1,0 +1,138 @@
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
+import EnroLinkLogo from '../assets/enrolink-logo 2.png'
+
+export default function HeadSidebar() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+  const [showLogout, setShowLogout] = useState(false)
+
+  const tabs = [
+    {
+      name: 'Dashboard',
+      path: '/head/dashboard',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M3 4a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zM14 4a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V4zM14 10a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2z" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Records',
+      path: '/head/records',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M4 5a2 2 0 012-2h6l2 2h6a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Batch Management',
+      path: '/head/batch-management',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Enrollment Officers',
+      path: '/head/enrollment-officers',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Archive',
+      path: '/head/archive',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Settings',
+      path: '/head/settings',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+  ]
+
+  const isActive = (path) => {
+    if (path === '/head/dashboard') {
+      return location.pathname === '/head/dashboard' || location.pathname === '/head'
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`)
+  }
+
+  return (
+    <aside className="flex flex-col min-h-screen w-80 bg-gradient-to-b from-red-300 to-pink-100">
+      <div className="p-8 flex justify-center overflow-visible">
+        <Link to={'/head'}>
+          <img
+            src={EnroLinkLogo}
+            alt="EnroLink-logo"
+            className="w-48 h-auto mt-[50px] mb-[30px] transform scale-125 origin-center z-10 transition-transform duration-200"
+          />
+        </Link>
+      </div>
+
+      <nav className="flex-1 px-9">
+        <ul className="space-y-4">
+          {tabs.map((tab, index) => {
+            const active = isActive(tab.path)
+            return (
+              <li key={index}>
+                <Link
+                  to={tab.path}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 ${
+                    active ? 'bg-pink-900 text-white' : 'text-pink-900 hover:bg-pink-200'
+                  }`}
+                >
+                  <span className={`${active ? 'text-white' : 'text-pink-800'}`}>{tab.icon}</span>
+                  <span className="font-medium text-sm">{tab.name}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+
+      <div className="p-8">
+        <a
+          href="#"
+          onClick={(e)=>{e.preventDefault(); setShowLogout(true)}}
+          className="flex items-center gap-3 px-4 py-3 rounded-full text-pink-800 hover:bg-pink-200 transition-all duration-200"
+        >
+          <svg className="w-5 h-5 text-pink-800" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+          </svg>
+          <span className="font-medium text-sm">Log out</span>
+        </a>
+      </div>
+
+      {showLogout && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[460px] p-7 mx-auto border-2 border-[#6b2b2b]">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Log out?</h2>
+              <p className="text-sm text-[#7c3a4a] mt-1">You will be returned to the login page.</p>
+            </div>
+            <div className="flex gap-4 justify-center mt-6">
+              <button onClick={()=>setShowLogout(false)} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 text-sm">Cancel</button>
+              <button onClick={()=>{ setShowLogout(false); logout(); navigate('/login'); }} className="bg-[#6b0000] text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 text-sm">Log out</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </aside>
+  )
+}
