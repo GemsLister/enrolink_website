@@ -28,9 +28,13 @@ export default function BatchDetailsModal({
   const canEditInterviewer = !!user && user.role === 'DEPT_HEAD'
   const [interviewers, setInterviewers] = useState([])
   const [localInterviewer, setLocalInterviewer] = useState(selectedBatch?.interviewer || '')
+  const [editCode, setEditCode] = useState(selectedBatch?.code || '')
   const [editInterviewer, setEditInterviewer] = useState(selectedBatch?.interviewer || '')
   const [editStatus, setEditStatus] = useState(selectedBatch?.status || 'ONGOING')
   const [membersQuery, setMembersQuery] = useState('')
+  const [passedCandidates, setPassedCandidates] = useState([])
+  const [passedQuery, setPassedQuery] = useState('')
+  const [selectedCandidateId, setSelectedCandidateId] = useState('')
 
   useEffect(() => {
     let active = true
@@ -57,7 +61,34 @@ export default function BatchDetailsModal({
     setLocalInterviewer(selectedBatch?.interviewer || '')
     setEditInterviewer(selectedBatch?.interviewer || '')
     setEditStatus(selectedBatch?.status || 'ONGOING')
+    setEditCode(selectedBatch?.code || '')
   }, [selectedBatch])
+  useEffect(() => {
+    let active = true
+    async function loadPassed() {
+      if (!showAdd) return
+      try {
+        const a = await api.get('/students?recordCategory=applicants&status=PASSED')
+        const e = await api.get('/students?recordCategory=enrollees&status=PASSED')
+        const rowsA = Array.isArray(a?.rows) ? a.rows : []
+        const rowsE = Array.isArray(e?.rows) ? e.rows : []
+        const existing = new Set((members || []).map(m => (m.email || '').toLowerCase()))
+        const combined = [...rowsA, ...rowsE]
+          .map(s => ({
+            id: String(s._id || ''),
+            firstName: s.firstName || '',
+            lastName: s.lastName || '',
+            email: s.email || '',
+            interviewDate: s.interviewDate || '',
+            status: (s.status || '').toString().toUpperCase(),
+          }))
+          .filter(s => !existing.has((s.email || '').toLowerCase()))
+        if (active) setPassedCandidates(combined)
+      } catch (_) { if (active) setPassedCandidates([]) }
+    }
+    loadPassed()
+    return () => { active = false }
+  }, [api, showAdd, members])
   useEffect(() => {
     let active = true
     async function loadInterviewers() {
@@ -73,7 +104,7 @@ export default function BatchDetailsModal({
   async function onSave() {
     if (!canEditInterviewer) return
     try {
-      await saveBatchEdits(selectedBatch.id, editInterviewer, editStatus)
+      await saveBatchEdits(selectedBatch.id, editInterviewer, editStatus, editCode)
       setLocalInterviewer(editInterviewer)
       closeModal()
     } catch (_) { }
@@ -97,12 +128,12 @@ export default function BatchDetailsModal({
   }, [members, membersQuery])
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-[32px] shadow-[0_12px_24px_rgba(139,23,47,0.08)] w-full max-w-xl p-8 mx-auto max-h-[85vh] overflow-hidden relative border border-[#efccd2]">
+      <div className="rounded-[32px] shadow-[0_35px_90px_rgba(239,150,150,0.35)] w-full max-w-xl p-8 mx-auto max-h-[85vh] overflow-hidden relative border-2 border-[#6b2b2b] bg-gradient-to-b from-[#f4c3c6] to-[#f3b1b7]">
         <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
         <div className="grid grid-cols-3 text-center mb-6">
 
           <div className='col-2 w-full'>
-            <h2 className="text-2xl font-bold text-[#7d102a]">Edit Batch</h2>
+            <h2 className="text-2xl font-bold text-[#6b2b2b]">Edit Batch</h2>
           </div>
           <div className='col-3 flex justify-end w-full'>
             <button onClick={closeModal} aria-label="Close" className="text-gray-700 hover:text-gray-900 transition-colors">
@@ -114,7 +145,7 @@ export default function BatchDetailsModal({
         </div>
         <div className="space-y-5">
           <div className="space-y-3">
-            <div className='flex flex-col gap-2'><h2 className='font-semibold text-[#5b1a30]'>Name</h2><input className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-red-400" placeholder="Enter batch name" value={editInterviewer} onChange={(e) => setEditInterviewer(e.target.value)} disabled={!canEditInterviewer} /></div>
+            <div className='flex flex-col gap-2'><h2 className='font-semibold text-[#5b1a30]'>Name</h2><input className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-red-400" placeholder="Enter batch name" value={editCode} onChange={(e) => setEditCode(e.target.value)} disabled={!canEditInterviewer} /></div>
             <div className='flex flex-col gap-2'>
               <h2 className='font-semibold text-[#5b1a30]'>Officer</h2>
               <select className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-red-400 appearance-none" value={editInterviewer} onChange={(e) => setEditInterviewer(e.target.value)} disabled={!canEditInterviewer}>
@@ -200,25 +231,30 @@ export default function BatchDetailsModal({
             )}
             {showAdd && (
               <div className="mt-3 bg-white rounded-[24px] border border-[#f3d5d5] p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="text" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="First Name" value={addValues.firstName} onChange={(e) => setAddValues(v => ({ ...v, firstName: e.target.value }))} />
-                  <input type="text" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Last Name" value={addValues.lastName} onChange={(e) => setAddValues(v => ({ ...v, lastName: e.target.value }))} />
-                  <input type="email" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Email (optional)" value={addValues.email} onChange={(e) => setAddValues(v => ({ ...v, email: e.target.value }))} />
-                  <input type="text" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Contact (optional)" value={addValues.contact} onChange={(e) => setAddValues(v => ({ ...v, contact: e.target.value }))} />
-                  <input type="date" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Interview Date" value={addValues.interviewDate || ''} onChange={(e) => setAddValues(v => ({ ...v, interviewDate: e.target.value }))} />
-                  <input type="number" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Exam Score" value={addValues.examScore || ''} onChange={(e) => setAddValues(v => ({ ...v, examScore: e.target.value }))} />
-                  <select className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" value={addValues.status} onChange={(e) => setAddValues(v => ({ ...v, status: e.target.value }))}>
-                    <option value="Pending">Pending</option>
-                    <option value="Interviewed">Interviewed</option>
-                    <option value="Passed">Passed</option>
-                    <option value="Failed">Failed</option>
-                    <option value="Enrolled">Enrolled</option>
-                    <option value="AWOL">AWOL</option>
+                <div className="grid grid-cols-1 gap-3">
+                  <input type="text" className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" placeholder="Search passed candidates" value={passedQuery} onChange={(e) => setPassedQuery(e.target.value)} />
+                  <select className="bg-white border border-[#efccd2] rounded-full px-4 py-2 text-sm text-gray-800 w-full" value={selectedCandidateId} onChange={(e) => {
+                    const id = e.target.value
+                    setSelectedCandidateId(id)
+                    const sel = passedCandidates.find(c => c.id === id)
+                    if (sel) {
+                      setAddValues(v => ({ ...v, firstName: sel.firstName, lastName: sel.lastName, email: sel.email || '', interviewDate: sel.interviewDate || '', status: 'Passed', candidateId: sel.id }))
+                    }
+                  }}>
+                    <option value="">Select Passed Candidate</option>
+                    {passedCandidates.filter(c => {
+                      const q = passedQuery.trim().toLowerCase()
+                      if (!q) return true
+                      const name = `${c.firstName} ${c.lastName}`.trim().toLowerCase()
+                      return name.includes(q) || String(c.email || '').toLowerCase().includes(q)
+                    }).map(c => (
+                      <option key={c.id} value={c.id}>{`${c.lastName}, ${c.firstName}`}{c.email ? ` — ${c.email}` : ''}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="flex justify-end gap-2 mt-3">
                   <button onClick={() => setShowAdd(false)} className="bg-white text-[#6b0000] border border-[#efccd2] px-5 py-2 rounded-full hover:bg-rose-50 transition-colors duration-200 font-medium text-sm">Cancel</button>
-                  <button onClick={handleAddStudentSubmit} disabled={!addValues.firstName.trim() || !addValues.lastName.trim()} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Save</button>
+                  <button onClick={handleAddStudentSubmit} disabled={!addValues.firstName.trim() || !addValues.lastName.trim()} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Add to Batch</button>
                 </div>
               </div>
             )}

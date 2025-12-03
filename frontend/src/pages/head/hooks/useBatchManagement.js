@@ -182,16 +182,17 @@ export function useBatchManagement(token, opts = {}) {
       setBatches(prev => prev.map(b => (b.id === id ? { ...b, status: label } : b)))
     } catch (_) {}
   }
-  const saveBatchEdits = async (batchId, interviewer, statusLabel) => {
+  const saveBatchEdits = async (batchId, interviewer, statusLabel, code) => {
     if (!batchId) return
     const payload = {}
     if (typeof interviewer === 'string') payload.interviewer = interviewer
     if (typeof statusLabel === 'string' && statusLabel) payload.status = (String(statusLabel).toUpperCase() === 'COMPLETED' ? 'INTERVIEWED' : 'PENDING')
+    if (typeof code === 'string' && code.trim()) payload.code = code.trim()
     try {
       const res = await api.put(`/batches/${batchId}`, payload)
       const doc = res?.doc || {}
-      setBatches(prev => prev.map(b => (b.id === batchId ? { ...b, interviewer: doc.interviewer || interviewer || b.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : b)))
-      setSelectedBatch(prev => prev ? { ...prev, interviewer: doc.interviewer || interviewer || prev.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : prev)
+      setBatches(prev => prev.map(b => (b.id === batchId ? { ...b, code: doc.code || code || b.code, interviewer: doc.interviewer || interviewer || b.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : b)))
+      setSelectedBatch(prev => prev ? { ...prev, code: doc.code || code || prev.code, interviewer: doc.interviewer || interviewer || prev.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : prev)
     } catch (_) {}
   }
   const closeModal = () => {
@@ -538,6 +539,7 @@ export function useBatchManagement(token, opts = {}) {
       batch: selectedBatch.year,
       interviewer: selectedBatch.interviewer || '',
     }
+    if (addValues.candidateId) payload.id = addValues.candidateId
     const rawDate = (addValues.interviewDate || '').trim()
     if (rawDate) {
       const d = new Date(rawDate)
@@ -553,12 +555,12 @@ export function useBatchManagement(token, opts = {}) {
       if (showMembers) setMembers(prev => [mapped, ...prev])
       setSelectedBatch(prev => prev ? { ...prev, studentsCount: (prev.studentsCount || 0) + 1 } : prev)
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? { ...b, studentsCount: (b.studentsCount || 0) + 1 } : b))
-      // create report record if exam score or interview meta provided
+      // create interview record for passed/failed or when exam score/date provided
       try {
         const scoreProvided = (addValues.examScore ?? '') !== ''
         const resultMap = { Pending: 'PENDING', Interviewed: 'PENDING', Passed: 'PASSED', Failed: 'FAILED', Enrolled: 'PASSED', AWOL: 'FAILED' }
         const result = resultMap[addValues.status] || 'PENDING'
-        if (scoreProvided || addValues.interviewDate) {
+        if (scoreProvided || addValues.interviewDate || result !== 'PENDING') {
           const rep = {
             studentName: `${payload.firstName} ${payload.lastName}`.trim(),
             batch: selectedBatch.year,
