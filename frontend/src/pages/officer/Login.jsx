@@ -6,6 +6,7 @@ import RecaptchaCheck from '../../components/RecaptchaCheck'
 import logo from '../../assets/enrolink-logo 2.png'
 import illo from '../../assets/Users-People-Protect-privacy-01.png'
 import GoogleSignIn from '../../components/GoogleSignIn'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function OfficerLogin() {
   const [email, setEmail] = useState('')
@@ -14,15 +15,16 @@ export default function OfficerLogin() {
   const [error, setError] = useState('')
   const [captcha, setCaptcha] = useState('')
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   async function onSubmit(e) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const res = await api.login({ email, password, captcha })
-      localStorage.setItem('token', res.token)
-      if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+      const res = await login({ email, password, captcha })
+      const role = String(res.role || '').toUpperCase()
+      if (role === 'DEPT_HEAD') navigate('/head/dashboard')
       else navigate('/officer/dashboard')
     } catch (err) {
       setError(err.message)
@@ -40,7 +42,8 @@ export default function OfficerLogin() {
             try {
               const res = await api.google({ idToken })
               localStorage.setItem('token', res.token)
-              if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+              const role = String(res.role || '').toUpperCase()
+              if (role === 'DEPT_HEAD') navigate('/head/dashboard')
               else navigate('/officer/dashboard')
             } catch (e) {
               setError(e.message)

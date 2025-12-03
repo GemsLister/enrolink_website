@@ -6,21 +6,27 @@ import { api } from '../../api/client'
 import CalendarGrid from '../../components/CalendarGrid'
 import QuickChart from '../../components/QuickChart'
 import ScheduleCreateModal from '../../components/ScheduleCreateModal'
+import ApplicantsIcon from '../../assets/applicants.png'
+import InterviewedIcon from '../../assets/interviewed.png'
+import EnrolledIcon from '../../assets/enrolled.png'
+import ScheduleIcon from '../../assets/Union.png'
 import RecentAddedIcon from '../../assets/recent-activity-added-student.png'
 import RecentEditedIcon from '../../assets/recent-activty-edited.png'
 import RecentArchiveIcon from '../../assets/recent-activity-icon-archive.png'
-import ApplicantsIcon from '../../assets/applicants.png'
-import ScheduleIcon from '../../assets/Union.png'
+ 
 
-function PlaceholderIcon({ size = 'w-11 h-11', variant = 'primary', label = 'icon' }) {
-  const styles = {
-    primary: 'bg-[#f2c6cf] text-[#8a1d35]',
-    secondary: 'bg-[#f0d9dd] text-[#b0475c]',
-    ghost: 'bg-white text-[#b0475c] border border-[#efccd2]',
+function StatIcon({ cardKey }) {
+  const iconMap = {
+    applicants: ApplicantsIcon,
+    interviewed: InterviewedIcon,
+    enrolled_bsit: EnrolledIcon,
+    enrolled_bsemc: EnrolledIcon,
+    enrolled_all: EnrolledIcon,
   }
+  const src = iconMap[cardKey] || ApplicantsIcon
   return (
-    <div className={`flex items-center justify-center rounded-full font-semibold uppercase tracking-[0.2em] text-[10px] ${size} ${styles[variant]}`}>
-      {label}
+    <div className="flex items-center justify-center rounded-full w-11 h-11 bg-[#f2c6cf]">
+      <img src={src} alt="" className="w-6 h-6" />
     </div>
   )
 }
@@ -85,6 +91,8 @@ export default function OfficerDashboard() {
   const [itPassersStrandData, setItPassersStrandData] = useState([])
   const [emcPassersStrandCounts, setEmcPassersStrandCounts] = useState([])
   const [itPassersStrandCounts, setItPassersStrandCounts] = useState([])
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const calendarId = import.meta.env.VITE_GOOGLE_CALENDAR_ID || 'primary'
 
   useEffect(() => {
     let alive = true
@@ -138,7 +146,7 @@ export default function OfficerDashboard() {
       const timeMin = startOfToday.toISOString()
       const timeMax = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
       try {
-        const data = await api.calendarEvents(token, { timeMin, timeMax })
+        const data = await api.calendarEvents(token, { timeMin, timeMax, calendarId })
         if (!alive) return
         const items = Array.isArray(data?.events) ? data.events : []
         items.sort((a, b) => new Date(a.start?.dateTime || a.start?.date || 0) - new Date(b.start?.dateTime || b.start?.date || 0))
@@ -157,6 +165,7 @@ export default function OfficerDashboard() {
     async function loadAssigned() {
       try {
         if (!token || !user?.email) return
+        if (String(user?.role).toUpperCase() !== 'DEPT_HEAD') return
         const res = await api.officersList(token)
         const me = (res?.rows || []).find(o => String(o.email || '').toLowerCase() === String(user.email || '').toLowerCase())
         if (!me) return
@@ -390,16 +399,14 @@ export default function OfficerDashboard() {
     setItConfirmedCounts(itChart.counts)
   }, [includeAllInterviewees, emcRowsAll, itRowsAll])
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (!user || user.role !== 'OFFICER') return <Navigate to="/" replace />
 
   const totals = stats.totals || { totalApplicants: 0, interviewed: 0, passedInterview: 0, enrolled: 0, awol: 0 }
   const summaryCards = [
-    { label: 'Total Applicant', value: totals.totalApplicants },
-    { label: 'Interviewed', value: totals.interviewed },
-    { label: 'Enrolled BSIT', value: bsitEnrolledCount },
-    { label: 'Enrolled BSEMC', value: bsemcEnrolledCount },
-    { label: 'Enrolled All Students', value: (bsitEnrolledCount + bsemcEnrolledCount) },
+    { key: 'applicants', label: 'Total Applicant', value: totals.totalApplicants },
+    { key: 'interviewed', label: 'Interviewed', value: totals.interviewed },
+    { key: 'enrolled_bsit', label: 'Enrolled BSIT', value: bsitEnrolledCount },
+    { key: 'enrolled_bsemc', label: 'Enrolled BSEMC', value: bsemcEnrolledCount },
+    { key: 'enrolled_all', label: 'Enrolled All Students', value: (bsitEnrolledCount + bsemcEnrolledCount) },
   ]
 
   const batches = stats.batchAnalytics || []
@@ -428,7 +435,7 @@ export default function OfficerDashboard() {
     const timeMin = startOfToday.toISOString()
     const timeMax = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
     try {
-      const data = await api.calendarEvents(token, { timeMin, timeMax })
+      const data = await api.calendarEvents(token, { timeMin, timeMax, calendarId })
       const items = Array.isArray(data?.events) ? data.events : []
       items.sort((a, b) => new Date(a.start?.dateTime || a.start?.date || 0) - new Date(b.start?.dateTime || b.start?.date || 0))
       setGcal(items)
@@ -465,7 +472,7 @@ export default function OfficerDashboard() {
     try {
       await Promise.all(
         archiveConfirmIds.map((id) =>
-          api.calendarDelete(token, id).catch((err) => {
+          api.calendarDelete(token, id, calendarId).catch((err) => {
             console.error('Failed to delete schedule', id, err)
             throw err
           })
@@ -503,16 +510,24 @@ export default function OfficerDashboard() {
     })
   }
 
-  return (
+  const redirectTo = (!isAuthenticated ? "/login" : (!user || user.role !== 'OFFICER' ? "/" : null))
+
+  return redirectTo ? (
+    <Navigate to={redirectTo} replace />
+  ) : (
     <div className="min-h-screen flex bg-white">
       <aside className="hidden lg:block w-80 shrink-0">
         <OfficerSidebar />
       </aside>
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
-        <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+        <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 min-h-[100dvh] overflow-y-auto">
+          <div className="lg:hidden mb-3">
+            <button onClick={() => setMobileOpen(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Menu</button>
+          </div>
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
           <div className="mt-4 flex gap-2">
             <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
+            <button onClick={() => setActiveTab('analytics')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='analytics' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Analytics</button>
             <button onClick={() => setActiveTab('leaderboards')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
           </div>
           <p className="mt-3 flex items-center gap-2 text-sm text-[#6e2a39]">
@@ -533,9 +548,9 @@ export default function OfficerDashboard() {
           </p>
           {activeTab === 'overview' && (<>
           <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {summaryCards.map((card, idx) => (
+            {summaryCards.map((card) => (
               <div key={card.label} className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40">
-                <PlaceholderIcon variant={idx % 2 === 0 ? 'primary' : 'secondary'} />
+                <StatIcon cardKey={card.key} />
                 <div className="text-[10px] uppercase tracking-[0.22em] text-[#a86a74] leading-4 text-center break-words whitespace-normal max-w-[8rem]">{card.label}</div>
                 {loading ? (<div className="h-3 w-10 rounded bg-[#f3d9de] animate-pulse" />) : (<span className="text-2xl font-extrabold text-[#7d102a]">{Number.isFinite(card.value) ? card.value : 0}</span>)}
               </div>
@@ -543,10 +558,14 @@ export default function OfficerDashboard() {
           </section>
           <section className="mt-6">
             <CalendarGrid key={calendarRefreshKey} />
-            <div className="mt-4 flex justify-end">
-              <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
+            <div className="mt-4 flex justify-between">
+              <button onClick={pushSchedulesToGoogle} className="h-9 rounded-md bg-white text-[#7d102a] text-[13px] font-semibold border border-[#efccd2] px-4">Sync schedules to Google</button>
+              <button onClick={() => setShowScheduleModal(true)} className="h-9 rounded-md bg[#8a1d35] bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Add schedule</button>
             </div>
           </section>
+          </>)}
+
+          {activeTab === 'analytics' && (
           <section className="mt-6 grid grid-cols-2 gap-8">
             {(courseFilter === 'IT') && (
               <>
@@ -556,7 +575,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: 320, height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -574,7 +593,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
                       token={token}
                       options={{
@@ -594,7 +613,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -618,7 +637,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -636,7 +655,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcPassersByStrand' }}
                       token={token}
                       options={{
@@ -656,7 +675,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -680,7 +699,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -698,7 +717,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
                       token={token}
                       options={{
@@ -738,7 +757,7 @@ export default function OfficerDashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -755,7 +774,7 @@ export default function OfficerDashboard() {
               </>
             )}
           </section>
-          </>)}
+          )}
           
           {error && (<div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">{error}</div>)}
           {showScheduleModal && (
@@ -1082,9 +1101,15 @@ export default function OfficerDashboard() {
                     key={activity.id}
                     className="flex gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(139,23,47,0.08)] border border-[#efccd2]"
                   >
-                    <div className="flex items-center justify-center rounded-full font-semibold uppercase tracking-[0.2em] text-[10px] w-12 h-12 bg-[#f0d9dd] text-[#b0475c]">
-                      icon
-                    </div>
+                    {(() => {
+                      const a = String(activity.action || '').toLowerCase()
+                      const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon))
+                      return (
+                        <div className="flex items-center justify-center rounded-full w-12 h-12 bg-[#f0d9dd]">
+                          <img src={src} alt="" className="w-6 h-6" />
+                        </div>
+                      )
+                    })()}
                     <div className="text-sm leading-relaxed text-[#7d102a]">
                       <p>
                         <span className="font-semibold">{activity.actor}</span> {activity.action}
@@ -1097,6 +1122,24 @@ export default function OfficerDashboard() {
           </div>
         </aside>
       </div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[1000]" onClick={() => setMobileOpen(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-xl" onClick={(e)=>e.stopPropagation()}>
+            <OfficerSidebar />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+  async function pushSchedulesToGoogle() {
+    if (!token) return
+    try {
+      setError('')
+      await api.calendarPushToGoogle(token)
+      await refreshCalendar()
+    } catch (e) {
+      setError(e.message || 'Failed to sync schedules to Google')
+    }
+  }

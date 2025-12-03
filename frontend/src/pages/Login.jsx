@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { api } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import RecaptchaCheck from '../components/RecaptchaCheck'
 import logo from '../assets/enrolink-logo 2.png'
 import illo from '../assets/Interface-Welcome-01.png'
@@ -14,16 +15,16 @@ export default function Login() {
   const [error, setError] = useState('')
   const [captcha, setCaptcha] = useState('')
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   async function onSubmit(e) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const res = await api.login({ email, password, captcha })
-      localStorage.setItem('token', res.token)
-      // Redirect based on role returned from server
-      if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+      const res = await login({ email, password, captcha })
+      const role = String(res.role || '').toUpperCase()
+      if (role === 'DEPT_HEAD') navigate('/head/dashboard')
       else navigate('/officer/dashboard')
     } catch (err) {
       setError(err.message)
@@ -41,7 +42,8 @@ export default function Login() {
             try {
               const res = await api.google({ idToken })
               localStorage.setItem('token', res.token)
-              if (res.role === 'DEPT_HEAD') navigate('/head/dashboard')
+              const role = String(res.role || '').toUpperCase()
+              if (role === 'DEPT_HEAD') navigate('/head/dashboard')
               else navigate('/officer/dashboard')
             } catch (e) {
               setError(e.message)

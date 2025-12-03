@@ -54,7 +54,6 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
 
         console.log('Requesting events with params:', { timeMin, timeMax, calendarId });
         const data = await listEvents({ timeMin, timeMax, calendarId }, token);
-        console.log('Received events data:', data);
 
         // Handle both formats: { items: [...] } and direct array
         const items = Array.isArray(data?.items)
@@ -67,7 +66,6 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
           return new Date(year, month - 1, day);
         };
 
-        console.log(`Found ${items.length} events`);
         const mapped = items.map((ev) => {
           const isAllDay = !!ev.start?.date && !!ev.end?.date && !ev.start?.dateTime && !ev.end?.dateTime;
           const startDate = isAllDay
@@ -98,11 +96,8 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
             },
           };
 
-          console.log('Mapped event:', eventData);
           return eventData;
         });
-
-        console.log('Setting events:', mapped);
         setEvents(mapped);
       } catch (e) {
         console.error("Error fetching events:", e);
@@ -216,7 +211,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
       setError("");
       
       // Delete from backend (which will delete from both database and Google Calendar)
-      await api.calendarDelete(token, eventId);
+      await api.calendarDelete(token, eventId, calendarId);
       
       // Remove from local state immediately
       setEvents((prev) => prev.filter((evt) => evt.id !== eventId));
@@ -231,7 +226,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     } finally {
       setLoading(false);
     }
-  }, [token, currentView, currentDate, updateEventsForView]);
+  }, [token, currentView, currentDate, updateEventsForView, calendarId]);
 
   const openArchiveConfirm = (ids) => {
     const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
@@ -251,7 +246,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
     try {
       setArchiveConfirmLoading(true);
       for (const id of archiveConfirmIds) {
-        try { await api.calendarDelete(token, id); } catch (_) {}
+        try { await api.calendarDelete(token, id, calendarId); } catch (_) {}
       }
       updateEventsForView(currentView, currentDate);
       setEvents((prev) => prev.filter(evt => !archiveConfirmIds.includes(evt.id)));
@@ -318,33 +313,7 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
 
   // Initial load
   useEffect(() => {
-    console.log('Initializing calendar with ID:', calendarId);
-    console.log('Using token:', token ? 'Token exists' : 'No token found');
-
-    // Log environment variables for debugging
-    console.log('Environment variables:', {
-      VITE_API_URL: import.meta.env.VITE_API_URL,
-      VITE_GOOGLE_CALENDAR_ID: import.meta.env.VITE_GOOGLE_CALENDAR_ID
-    });
-
     updateEventsForView(currentView, currentDate);
-
-    // Log the current date range being requested
-    const start = new Date(currentDate);
-    start.setDate(1);
-    const end = new Date(start);
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
-
-    console.log('Fetching events for date range:', {
-      start: start.toISOString(),
-      end: end.toISOString(),
-      view: currentView,
-      calendarId
-    });
-
-    // Log the current events state
-    console.log('Current events state:', events);
   }, [calendarId, token, updateEventsForView]); // Add token as a dependency
 
   // Auto-refresh when window gains focus or at intervals

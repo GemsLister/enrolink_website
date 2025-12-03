@@ -180,8 +180,17 @@ export const api = {
         const url = queryString ? `/calendar/events?${queryString}` : '/calendar/events';
         return request('GET', url, { token })
     },
-    calendarCreate: (event, token) => request('POST', '/calendar/events', { body: event, token }),
-    calendarUpdate: (eventId, event, token) => request('PATCH', `/calendar/events/${eventId}`, { body: event, token }),
-    calendarDelete: (token, eventId) => request('DELETE', `/calendar/events/${eventId}`, { token }),
+    calendarCreate: (event, token, calendarId) => {
+        const url = calendarId ? `/calendar/events?calendarId=${encodeURIComponent(calendarId)}` : '/calendar/events';
+        return request('POST', url, { body: event, token });
+    },
+    calendarUpdate: (eventId, event, token, calendarId) => {
+        const url = calendarId ? `/calendar/events/${eventId}?calendarId=${encodeURIComponent(calendarId)}` : `/calendar/events/${eventId}`;
+        return request('PATCH', url, { body: event, token });
+    },
+    calendarDelete: (token, eventId, calendarId) => {
+        const url = calendarId ? `/calendar/events/${eventId}?calendarId=${encodeURIComponent(calendarId)}` : `/calendar/events/${eventId}`;
+        return request('DELETE', url, { token });
+    },
     calendarPushToGoogle: (token) => request('POST', '/calendar/push', { token }) // Push database events to Google Calendar
 };

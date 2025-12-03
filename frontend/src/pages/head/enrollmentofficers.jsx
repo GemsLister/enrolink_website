@@ -12,8 +12,7 @@ export default function EnrollmentOfficers() {
   const [email, setEmail] = useState("");
   const [batches, setBatches] = useState([]);
   const [batchCode, setBatchCode] = useState("");
-  const [ttl, setTtl] = useState(1440);
-  const [inviteLink, setInviteLink] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [officers, setOfficers] = useState([]);
@@ -27,23 +26,12 @@ export default function EnrollmentOfficers() {
   const [officerToArchive, setOfficerToArchive] = useState(null);
   const [showBulkArchiveModal, setShowBulkArchiveModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
-  const [showNotif, setShowNotif] = useState(false);
+  
   const [invites, setInvites] = useState([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState("");
 
-  async function toggleInterviewer(officer) {
-    try {
-      const payload = { canInterview: !officer.canInterview };
-      if (typeof officer.__v === "number") payload.__v = officer.__v;
-      const updated = await api.officerUpdate(token, officer._id, payload);
-      setOfficers((list) =>
-        list.map((o) => (o._id === officer._id ? { ...o, ...updated.doc } : o))
-      );
-    } catch (e) {
-      alert(e.message || "Failed to update");
-    }
-  }
+  
 
   const toggleOfficerSelection = (officerId) => {
     setSelectedOfficers((prev) =>
@@ -99,7 +87,7 @@ export default function EnrollmentOfficers() {
       try {
         const res = await api.officersList(token);
         if (mounted) setOfficers(res.rows || []);
-      } catch (_) {
+      } catch {
         if (mounted) setOfficers([]);
       }
     }
@@ -107,7 +95,7 @@ export default function EnrollmentOfficers() {
       try {
         const res = await api.officersArchivedList(token);
         if (mounted) setArchivedOfficers(res.rows || []);
-      } catch (_) {
+      } catch {
         if (mounted) setArchivedOfficers([]);
       }
     }
@@ -115,7 +103,7 @@ export default function EnrollmentOfficers() {
       try {
         const res = await api.batchesList(token);
         if (mounted) setBatches(res.rows || []);
-      } catch (_) {
+      } catch {
         if (mounted) setBatches([]);
       }
     }
@@ -131,7 +119,6 @@ export default function EnrollmentOfficers() {
 
   async function invite() {
     setError("");
-    setInviteLink("");
     const em = email.trim().toLowerCase();
     if (!em) {
       setError("Email is required");
@@ -153,22 +140,21 @@ export default function EnrollmentOfficers() {
       // Derive year from selected batch code if available
       const foundBatch = batches.find((b) => b.code === batchCode);
       const year = foundBatch ? String(foundBatch.year) : undefined;
-      const res = await api.officerInvite(token, {
+      await api.officerInvite(token, {
         email: em,
         year,
         batch: batchCode || undefined,
-        ttlMinutes: Number(ttl) || 1440,
+        ttlMinutes: 1440,
       });
-      setInviteLink(res.inviteLink || "");
       setEmail("");
       setBatchCode("");
       // refresh list after invite in case officer signs up quickly
       try {
         const r = await api.officersList(token);
         setOfficers(r.rows || []);
-      } catch (_) { }
+      } catch (e) { void e }
       // refresh pending invites list silently
-      try { await loadInvites({ silent: true }); } catch (_) {}
+      try { await loadInvites({ silent: true }); } catch (e) { void e }
       return true;
     } catch (e) {
       setError(e.message);
@@ -215,22 +201,7 @@ export default function EnrollmentOfficers() {
     return `${days} day${days === 1 ? '' : 's'} ago`;
   }
 
-  function openGmailCompose() {
-    if (!inviteLink) return;
-    const subject = encodeURIComponent("EnroLink Officer Invitation");
-    const body =
-      encodeURIComponent(`You have been invited as an Enrollment Officer.
-
-Sign-up link: ${inviteLink}
-
-Use your Gmail to register. The link expires in ${ttl} minutes.`);
-    window.open(
-      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-        email
-      )}&su=${subject}&body=${body}`,
-      "_blank"
-    );
-  }
+  
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user || user.role !== "DEPT_HEAD") return <Navigate to="/" replace />;
@@ -390,31 +361,31 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
 
         {showAddModal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[520px] p-7 mx-auto border-2 border-[#6b2b2b]">
+            <div className="bg-pink-200 rounded-xl shadow-lg w-full max-w-[520px] p-7 mx-auto border border-pink-400">
               <div className="relative text-center mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Add Enrollment Officer</h2>
                 <button onClick={() => setShowAddModal(false)} aria-label="Close" className="absolute top-2 right-3 text-gray-700 hover:text-gray-900 transition-colors rounded-full p-1">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <div className="flex justify-center mt-4">
-                  <img src={Union} alt="Union" className="w-24 h-24" />
+                  <svg className="w-24 h-24 text-white" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
                 </div>
               </div>
               {error && <div className="text-sm text-red-700 mb-2">{error}</div>}
-              <div className="grid gap-4">
-                <div className="grid grid-cols-[100px_1fr] items-center gap-1">
+              <div className="space-y-4">
+                <div className="space-y-2">
                   <label className="text-white font-semibold text-sm text-left">Gmail</label>
-                  <div>
-                    <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
-                    {duplicateOfficer && (
-                      <div className="text-xs text-red-700 mt-1">Officer already exists</div>
-                    )}
-                    {!duplicateOfficer && duplicateArchivedOfficer && (
-                      <div className="text-xs text-red-700 mt-1">Officer exists in archive; restore instead</div>
-                    )}
-                  </div>
+                  <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+                  {duplicateOfficer && (
+                    <div className="text-xs text-red-700">Officer already exists</div>
+                  )}
+                  {!duplicateOfficer && duplicateArchivedOfficer && (
+                    <div className="text-xs text-red-700">Officer exists in archive; restore instead</div>
+                  )}
                 </div>
-                <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                <div className="space-y-2">
                   <label className="text-white font-semibold text-sm text-left">Assign Batch</label>
                   <select value={batchCode} onChange={(e)=>setBatchCode(e.target.value)} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full">
                     <option value="">None</option>
@@ -424,7 +395,7 @@ Use your Gmail to register. The link expires in ${ttl} minutes.`);
                   </select>
                 </div>
                 <div className="mt-2">
-                  <button onClick={async ()=>{ const ok = await invite(); if (ok) setShowAddModal(false); }} disabled={loading || !email.trim() || duplicateOfficer || duplicateArchivedOfficer} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
+                  <button onClick={async ()=>{ const ok = await invite(); if (ok) setShowAddModal(false); }} disabled={loading || !email.trim() || duplicateOfficer || duplicateArchivedOfficer} className="bg-pink-800 disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-pink-900 transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
                 </div>
               </div>
             </div>

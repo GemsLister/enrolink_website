@@ -108,9 +108,9 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
       
       const isEditing = Boolean(initial?.id)
       if (isEditing) {
-        await api.calendarUpdate(initial.id, eventData, token)
+        await api.calendarUpdate(initial.id, eventData, token, calendarPick || 'primary')
       } else {
-        await api.calendarCreate(eventData, token)
+        await api.calendarCreate(eventData, token, calendarPick || 'primary')
       }
       try { if (window.gtag) window.gtag('event', isEditing ? 'schedule_update' : 'schedule_create', { all_day: !!allDay }) } catch (_) {}
       setSummary('')
@@ -134,7 +134,7 @@ export default function ScheduleCreateModal({ open, onClose, onCreated, calendar
     try {
       setDeleteLoading(true)
       setError('')
-      await api.calendarDelete(token, initial.id)
+      await api.calendarDelete(token, initial.id, calendarPick || 'primary')
       onCreated?.() // Refresh the calendar
       onClose?.()
     } catch (err) {

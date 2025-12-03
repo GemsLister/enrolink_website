@@ -78,10 +78,12 @@ export default function Dashboard() {
   const [startYear, setStartYear] = useState(String(new Date().getFullYear()));
   const [searchQuery, setSearchQuery] = useState("");
   const [activities, setActivities] = useState([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [gcal, setGcal] = useState([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [gaPushing, setGaPushing] = useState(false);
+  const [calPushing, setCalPushing] = useState(false);
   const [emcTop, setEmcTop] = useState([]);
   const [itTop, setItTop] = useState([]);
   const [emcConfirmedData, setEmcConfirmedData] = useState([]);
@@ -458,6 +460,26 @@ export default function Dashboard() {
       setGaPushing(false);
     }
   }
+  async function pushSchedulesToGoogle() {
+    if (!token) return;
+    try {
+      setCalPushing(true);
+      setError('');
+      await api.calendarPushToGoogle(token);
+      const now = new Date();
+      const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0);
+      const timeMin = startOfToday.toISOString();
+      const timeMax = new Date(now.getTime() + 365*24*60*60*1000).toISOString();
+      const data = await api.calendarEvents(token, { timeMin, timeMax, calendarId });
+      const items = Array.isArray(data?.events) ? data.events : [];
+      items.sort((a,b) => new Date(a.start?.dateTime||a.start?.date||0) - new Date(b.start?.dateTime||b.start?.date||0));
+      setGcal(items);
+    } catch (e) {
+      setError(e.message || 'Failed to sync schedules to Google');
+    } finally {
+      setCalPushing(false);
+    }
+  }
 
   const redirectTo = (!isAuthenticated ? "/login" : (!user || user.role !== "DEPT_HEAD" ? "/" : null));
 
@@ -494,8 +516,7 @@ export default function Dashboard() {
     <Navigate to={redirectTo} replace />
   ) : (
     <div className="min-h-screen flex bg-white">
-      {/* Left Sidebar (already styled to match) */}
-      <aside className="w-80 shrink-0">
+      <aside className="hidden lg:block w-80 shrink-0">
         <Sidebar />
       </aside>
 
@@ -503,9 +524,13 @@ export default function Dashboard() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* Main content */}
         <main className="bg-[#f7f1f2] px-4 sm:px-10 py-6 sm:py-8 min-h-[100dvh] overflow-y-auto">
+          <div className="lg:hidden mb-3">
+            <button onClick={() => setMobileOpen(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Menu</button>
+          </div>
           <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">DASHBOARD</h1>
           <div className="mt-4 flex gap-2">
             <button onClick={() => setActiveTab('overview')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='overview' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Overview</button>
+            <button onClick={() => setActiveTab('analytics')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='analytics' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Analytics</button>
             <button onClick={() => setActiveTab('leaderboards')} className={`h-8 rounded-md px-3 text-[12px] font-semibold ${activeTab==='leaderboards' ? 'bg-[#8a1d35] text-white' : 'border border-[#efccd2] text-[#7d102a]'}`}>Leaderboards</button>
           </div>
           {archiveConfirmOpen && (
@@ -588,7 +613,8 @@ export default function Dashboard() {
           <>
             <section className="mt-6">
               <CalendarGrid key={calendarRefreshKey} />
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-between">
+                <button onClick={pushSchedulesToGoogle} disabled={calPushing} className="h-9 rounded-md bg-white text-[#7d102a] text-[13px] font-semibold border border-[#efccd2] px-4 disabled:opacity-50">{calPushing ? 'Syncing…' : 'Sync schedules to Google'}</button>
                 <button
                   onClick={() => setShowScheduleModal(true)}
                   className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4"
@@ -598,6 +624,9 @@ export default function Dashboard() {
               </div>
             </section>
 
+          </>)}
+
+          {activeTab === 'analytics' && (
             <section className="mt-6 grid grid-cols-1 grid-rows-4 gap-3">
             {(courseFilter === 'IT') && (
               <div className="grid grid-cols-2 h-[20%] gap-8">
@@ -607,7 +636,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: 320, height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -625,7 +654,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
                       token={token}
                       options={{
@@ -645,7 +674,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -669,7 +698,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -687,7 +716,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcPassersByStrand' }}
                       token={token}
                       options={{
@@ -707,7 +736,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.emcConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -731,7 +760,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="PieChart"
                       className=""
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.passRatePie' }}
                       token={token}
                       options={{
@@ -749,7 +778,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '100%', height: 360 }}
+                      style={{ width: '100%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itPassersByStrand' }}
                       token={token}
                       options={{
@@ -789,7 +818,7 @@ export default function Dashboard() {
                     <QuickChart
                       type="BarChart"
                       className="mt-4"
-                      style={{ width: '70%', height: 360 }}
+                      style={{ width: '70%', height: 300 }}
                       dataSource={{ url: '/dashboard/stats', params: { year: startYear }, path: 'charts.itConfirmedByPercentile' }}
                       token={token}
                       options={{
@@ -826,7 +855,6 @@ export default function Dashboard() {
               </div>
             )}
             </section>
-          </>
           )}
 
           {activeTab === 'leaderboards' && (
@@ -1215,6 +1243,14 @@ export default function Dashboard() {
           </div>
         </aside>
       </div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[1000]" onClick={() => setMobileOpen(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-xl" onClick={(e)=>e.stopPropagation()}>
+            <Sidebar />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

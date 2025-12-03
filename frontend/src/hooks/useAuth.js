@@ -23,7 +23,7 @@ export function useAuth() {
     try {
       const cached = localStorage.getItem('userProfile')
       if (cached) return JSON.parse(cached)
-    } catch (_) {}
+    } catch { void 0 }
     return token ? decodeJwt(token) : null
   })
 
@@ -31,26 +31,42 @@ export function useAuth() {
   useEffect(() => {
     if (token) localStorage.setItem('token', token)
     else localStorage.removeItem('token')
+
     const payload = token ? decodeJwt(token) : null
-    setUser(payload)
-    // Proactively fetch full user profile to prevent stale data after re-login
+    if (payload) {
+      setUser(payload)
+    } else {
+      try {
+        const cached = localStorage.getItem('userProfile')
+        if (cached) setUser(JSON.parse(cached))
+        else setUser(null)
+      } catch (_) {
+        setUser(null)
+      }
+    }
+
     async function refresh() {
       try {
-        if (!token || !payload) return
-        const role = String(payload.role || '').toUpperCase()
+        if (!token) return
+        let roleSource = payload
+        if (!roleSource) {
+          try { const cached = localStorage.getItem('userProfile'); roleSource = cached ? JSON.parse(cached) : null } catch { void 0 }
+        }
+        const role = String((roleSource || {}).role || '').toUpperCase()
+        if (!role) return
         const res = role === 'OFFICER' ? await api.request('GET', '/auth/officer/me', { token }) : await api.request('GET', '/auth/me', { token })
         if (res && res.user) {
           setUser(res.user)
-          try { localStorage.setItem('userProfile', JSON.stringify(res.user)) } catch (_) {}
+          try { localStorage.setItem('userProfile', JSON.stringify(res.user)) } catch { void 0 }
         }
-      } catch (_) {}
+      } catch { void 0 }
     }
     refresh()
   }, [token])
 
   const isAuthenticated = !!token
 
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     try {
       const response = await api.login(credentials)
       const tokenStr = response.token
@@ -62,18 +78,18 @@ export function useAuth() {
         const res = role === 'OFFICER' ? await api.request('GET', '/auth/officer/me', { token: tokenStr }) : await api.request('GET', '/auth/me', { token: tokenStr })
         if (res && res.user) {
           setUser(res.user)
-          try { localStorage.setItem('userProfile', JSON.stringify(res.user)) } catch (_) {}
+          try { localStorage.setItem('userProfile', JSON.stringify(res.user)) } catch { void 0 }
         }
-      } catch (_) {}
+      } catch { void 0 }
       return response
     } catch (error) {
       console.error('Login error:', error)
       throw error
     }
-  }
+  }, [])
 
   const logout = useCallback(() => {
-    try { localStorage.removeItem('userProfile') } catch (_) {}
+    try { localStorage.removeItem('userProfile') } catch { void 0 }
     setToken('')
   }, [])
 

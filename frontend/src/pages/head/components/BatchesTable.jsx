@@ -113,7 +113,7 @@ export default function BatchesTable({
               <td className='px-4 py-3'>
                 <button
                   type="button"
-                  onClick={() => (openEditModal ? openEditModal(batch) : handleRowClick(batch))}
+                  onClick={(e) => { e.stopPropagation(); (openEditModal ? openEditModal(batch) : handleRowClick(batch)); }}
                   className="flex justify-center p-1 rounded-[10px] border border-gray-300 hover:bg-gray-100 text-gray-700"
                   aria-label="Edit batch"
                 >
