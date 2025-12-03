@@ -32,9 +32,15 @@ UserSchema.add({
   permissions: {
     type: Object,
     default: {
-      validateRequirements: false,
+      // Legacy flag (kept for backward compatibility; UI now uses createRecords/editRecords)
       editProfiles: false,
+      // Core workflow permissions
+      validateRequirements: false,
+      createRecords: false,
+      editRecords: false,
       processEnrollment: false,
+      archiveRecords: false,
+      // Other capabilities
       manageSchedule: false,
       generateReports: false,
       viewRecordsAllPrograms: false
