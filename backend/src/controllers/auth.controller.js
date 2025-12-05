@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import OfficerInvite from '../models/OfficerInvite.js';
 import HeadUser from '../models/HeadUser.js';
 import { getOfficerUserModel } from '../models/User.js';
+import LoginEvent from '../models/LoginEvent.js';
 import { badRequest, unauthorized } from '../utils/errors.js';
 import { verifyIdToken } from '../services/google/oauth.js';
 import PasswordReset from '../models/PasswordReset.js';
@@ -59,6 +60,19 @@ export async function login(req, res, next) {
     const ok = await bcrypt.compare(password || '', user.passwordHash);
     if (!ok) return next(unauthorized('Invalid credentials'));
     const token = jwt.sign({ id: user._id, role: user.role, name: user.name, src: source }, process.env.JWT_SECRET, { expiresIn: '12h' });
+
+    // Fire-and-forget login audit log
+    try {
+      await LoginEvent.create({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        source: 'password',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    } catch (_) {}
+
     res.json({ token, role: user.role, name: user.name });
   } catch (e) { next(e); }
 }
@@ -241,6 +255,18 @@ export async function signupWithInvite(req, res, next) {
       await Promise.all(targets.map(to => sendOfficerSignupNotice(to, invite.email)));
     } catch (_) {}
     const jwtToken = jwt.sign({ id: user._id, role: user.role, name: user.name }, process.env.JWT_SECRET, { expiresIn: '12h' });
+
+    try {
+      await LoginEvent.create({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        source: 'invite-password',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    } catch (_) {}
+
     res.json({ token: jwtToken });
   } catch (e) { next(e); }
 }
@@ -303,6 +329,18 @@ export async function googleAuth(req, res, next) {
       if (o && o.archived) return next(unauthorized('Account archived'));
     }
     const token = jwt.sign({ id: user._id, role: user.role, name: user.name }, process.env.JWT_SECRET, { expiresIn: '12h' });
+
+    try {
+      await LoginEvent.create({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        source: 'google',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    } catch (_) {}
+
     res.json({ token, role: user.role, name: user.name });
   } catch (e) { next(e); }
 }
@@ -324,7 +362,8 @@ export async function requestPasswordReset(req, res, next) {
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60000);
     const pr = await PasswordReset.create({ email: user.email, token, expiresAt });
-    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${pr.token}`;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetLink = `${clientUrl}/reset-password?token=${pr.token}`;
     try {
       await sendPasswordResetEmail(user.email, resetLink);
     } catch (mailErr) {

@@ -416,8 +416,15 @@ export function RecordsOverviewContent({ basePath }) {
 }
 
 export function RecordsPanel({ token, view = 'applicants', basePath }) {
-    const api = useApi(token)
+  const api = useApi(token)
   const { user } = useAuth()
+  const officerPerms = (user && user.role === 'OFFICER' && user.permissions) ? user.permissions : {}
+  const canCreateRecords = !!officerPerms.createRecords
+  const canEditRecords = !!officerPerms.editRecords
+  const canProcessEnrollment = !!officerPerms.processEnrollment
+  const canImportXlsx = !!officerPerms.viewRecordsAllPrograms
+  const canExportPdf = !!officerPerms.generateReports
+  const canArchiveRecords = !!officerPerms.archiveRecords
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
@@ -858,6 +865,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const toggleArchiveConfirm = (row) => {
     const id = getRowId(row)
     if (!id) return
+    if (user && user.role === 'OFFICER' && !canArchiveRecords) {
+      setBanner({ type: 'error', message: 'You do not have permission to archive or restore records.' })
+      return
+    }
     if (confirmArchiveIds.includes(id)) {
       setConfirmArchiveIds((prev) => prev.filter((x) => x !== id))
     } else {
@@ -888,6 +899,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const identifier = row._id || row.__clientId
     if (!identifier) return
     if (row.archived_at || isArchiveView) return
+    // Officers can enter edit mode if they are allowed to edit details OR move between categories
+    if (user && user.role === 'OFFICER' && !canEditRecords && !canProcessEnrollment) return
     if (tableScrollRef.current) {
       lastScrollPosRef.current = {
         left: tableScrollRef.current.scrollLeft || 0,
@@ -1006,6 +1019,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }, [editingId, focusEditingRow])
 
   const handleAddNew = () => {
+    if (user && user.role === 'OFFICER' && !canCreateRecords) {
+      setBanner({ type: 'error', message: 'You do not have permission to add new records.' })
+      return
+    }
     cancelEditing()
     const clientId = `temp-${Date.now()}`
     const freshRow = { ...EMPTY_RECORD, recordCategory: currentCategory, __clientId: clientId }
@@ -1030,6 +1047,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   }
 
   const handleImportFile = async (event) => {
+    if (user && user.role === 'OFFICER' && !canImportXlsx) {
+      setBanner({ type: 'error', message: 'You do not have permission to import from XLSX.' })
+      return
+    }
     const file = event.target.files?.[0]
     if (!file) return
     try {
@@ -1360,14 +1381,27 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             )}
             <button
               type="button"
-              onClick={() => { setExportSelected(exportableColumns.map((c) => c.key)); setShowExportModal(true) }}
+              onClick={() => {
+                if (user && user.role === 'OFFICER' && !canExportPdf) {
+                  setBanner({ type: 'error', message: 'You do not have permission to export records to PDF.' })
+                  return
+                }
+                setExportSelected(exportableColumns.map((c) => c.key))
+                setShowExportModal(true)
+              }}
               className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400"
             >
               Export PDF
             </button>
             <button
               type="button"
-              onClick={() => setShowFormatModal(true)}
+              onClick={() => {
+                if (user && user.role === 'OFFICER' && !canImportXlsx) {
+                  setBanner({ type: 'error', message: 'You do not have permission to import using XLSX.' })
+                  return
+                }
+                setShowFormatModal(true)
+              }}
               disabled={importing}
               className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
             >

@@ -2,6 +2,8 @@ import { getRecordModel } from '../models/Record.js';
 import { getInterviewModel } from '../models/Interview.js';
 import { getBatchModel } from '../models/Batch.js';
 import { sendGaEvent } from '../services/analytics.js';
+import HeadUser from '../models/HeadUser.js';
+import ActivityEvent from '../models/ActivityEvent.js';
 
 function buildNameSignature({ firstName, middleName, lastName }) {
   const normalize = (value) => (value || '').trim().toLowerCase();
@@ -30,6 +32,7 @@ export async function list(req, res, next) {
     } else {
       q.archived_at = { $ne: null };
     }
+<<<<<<< HEAD
     // RBAC: Officers without viewRecordsAllPrograms can only view their assigned scope
     if (req.user && req.user.role === 'OFFICER') {
       try {
@@ -62,6 +65,11 @@ export async function list(req, res, next) {
         }
       } catch (_) {}
     }
+=======
+    // Note: Officers can now view all records; visibility is no longer restricted
+    // by viewRecordsAllPrograms. If needed, this can be reintroduced with a
+    // dedicated permission flag.
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
     const rows = await Model.find(q).lean();
     res.json({ rows });
   } catch (e) { 
@@ -83,18 +91,52 @@ export async function upsert(req, res, next) {
 
     const isArchiving = !!data.archived_at && String(data.archived_at).length > 0;
 
-    // RBAC: Officers require processEnrollment when changing enrollmentStatus or setting status to ENROLLED
-    if (req.user && req.user.role === 'OFFICER') {
+    const isOfficer = !!(req.user && req.user.role === 'OFFICER');
+    let officerPerms = {};
+    let officerDoc = null;
+    if (isOfficer) {
       try {
         const { getOfficerUserModel } = await import('../models/User.js');
         const User = getOfficerUserModel();
-        const officer = await User.findById(req.user.id).lean();
-        const perms = officer?.permissions || {};
-        const wantsEnroll = ['ENROLLED'].includes(String(data.status || '').toUpperCase()) || ['ENROLLED'].includes(String(data.enrollmentStatus || '').toUpperCase());
-        if (wantsEnroll && !perms.processEnrollment) {
-          return res.status(403).json({ error: 'Forbidden' });
+        officerDoc = await User.findById(req.user.id).lean();
+        officerPerms = officerDoc?.permissions || {};
+      } catch (_) {
+        officerPerms = {};
+      }
+    }
+
+    // Stamp audit metadata for who is performing this change (head or officer)
+    try {
+      if (req.user) {
+        if (isOfficer && officerDoc) {
+          data.lastModifiedById = officerDoc._id;
+          data.lastModifiedByRole = officerDoc.role || 'OFFICER';
+          if (officerDoc.name) data.lastModifiedByName = officerDoc.name;
+          if (officerDoc.email) data.lastModifiedByEmail = officerDoc.email;
+        } else if (req.user.role === 'DEPT_HEAD') {
+          const head = await HeadUser.findById(req.user.id).lean();
+          if (head) {
+            data.lastModifiedById = head._id;
+            data.lastModifiedByRole = head.role || 'DEPT_HEAD';
+            if (head.name) data.lastModifiedByName = head.name;
+            if (head.email) data.lastModifiedByEmail = head.email;
+          }
         }
-      } catch (_) {}
+      }
+    } catch (_) {}
+
+    const isNew = !id;
+    if (isOfficer) {
+      // Archiving or restoring always requires archiveRecords
+      if (isArchiving && !officerPerms.archiveRecords) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      // Creating live records requires createRecords
+      if (!isArchiving && isNew && !officerPerms.createRecords) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      // For existing records, we check edit vs processEnrollment after we know
+      // whether this is a same-collection edit or a cross-collection move.
     }
     const Live = getRecordModel(kind, false);
     const Arch = getRecordModel(kind, true);
@@ -134,6 +176,14 @@ export async function upsert(req, res, next) {
           }
           Object.assign(inArch, data);
           await inArch.save();
+          await ActivityEvent.create({
+            actorId: data.lastModifiedById,
+            actorName: data.lastModifiedByName,
+            actorEmail: data.lastModifiedByEmail,
+            actorRole: data.lastModifiedByRole,
+            type: 'student_archive',
+            description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} archived a student record.`,
+          });
           return res.json({ doc: inArch.toObject() });
         }
         const inLive = await Live.findById(id);
@@ -142,13 +192,32 @@ export async function upsert(req, res, next) {
           if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
           await Arch.create({ _id: inLive._id, ...inLive.toObject(), ...data });
           await Live.findByIdAndDelete(inLive._id);
+          await ActivityEvent.create({
+            actorId: data.lastModifiedById,
+            actorName: data.lastModifiedByName,
+            actorEmail: data.lastModifiedByEmail,
+            actorRole: data.lastModifiedByRole,
+            type: 'student_archive',
+            description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} archived a student record.`,
+          });
           return res.json({ doc: { _id: inLive._id } });
         }
       }
       const duplicate = nameSignature ? await Arch.findOne(dupFilter).lean() : null;
       if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
       const created = await Arch.create(id ? { _id: id, ...data } : data);
+<<<<<<< HEAD
       await maybeUpsertInterview(created, kind);
+=======
+      await ActivityEvent.create({
+        actorId: data.lastModifiedById,
+        actorName: data.lastModifiedByName,
+        actorEmail: data.lastModifiedByEmail,
+        actorRole: data.lastModifiedByRole,
+        type: 'student_archive',
+        description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} archived a student record.`,
+      });
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
       return res.json({ doc: created.toObject() });
     }
 
@@ -175,8 +244,11 @@ export async function upsert(req, res, next) {
       }
 
       if (sourceDoc) {
-        // If already in target collection, update
+        // If already in target collection, this is a normal edit
         if (sourceKind === kind) {
+          if (isOfficer && !officerPerms.editRecords) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
           if (__v !== undefined && sourceDoc.__v !== __v) {
             return res.status(409).json({ error: 'Conflict: record has been modified by another user' });
           }
@@ -184,33 +256,93 @@ export async function upsert(req, res, next) {
           if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
           Object.assign(sourceDoc, data, { archived_at: null });
           await sourceDoc.save();
+<<<<<<< HEAD
           await maybeUpsertInterview(sourceDoc, kind);
+=======
+
+          await ActivityEvent.create({
+            actorId: data.lastModifiedById,
+            actorName: data.lastModifiedByName,
+            actorEmail: data.lastModifiedByEmail,
+            actorRole: data.lastModifiedByRole,
+            type: isNew ? 'student_add' : 'student_edit',
+            description: isNew
+              ? `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} added a student record.`
+              : `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} edited a student record.`,
+          });
+
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
           return res.json({ doc: sourceDoc.toObject() });
         }
         // Relocate across collections without duplicating
+        if (isOfficer && !officerPerms.processEnrollment) {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
         const duplicate = nameSignature ? await Live.findOne({ ...dupFilter, _id: { $ne: id } }).lean() : null;
         if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
         const relocated = await Live.create({ _id: sourceDoc._id, ...sourceDoc.toObject(), ...data, archived_at: null });
         await sourceModel.findByIdAndDelete(sourceDoc._id);
+<<<<<<< HEAD
         await maybeUpsertInterview(relocated, kind);
+=======
+
+        await ActivityEvent.create({
+          actorId: data.lastModifiedById,
+          actorName: data.lastModifiedByName,
+          actorEmail: data.lastModifiedByEmail,
+          actorRole: data.lastModifiedByRole,
+          type: 'student_move',
+          description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} moved a student record between categories.`,
+        });
+
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
         return res.json({ doc: { _id: sourceDoc._id } });
       }
 
       // Check if exists in target archives (restore path)
       const inArch = await Arch.findById(id);
       if (inArch) {
+        if (isOfficer && !officerPerms.archiveRecords) {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
         const duplicate = nameSignature ? await Live.findOne({ ...dupFilter, _id: { $ne: id } }).lean() : null;
         if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
         const restored = await Live.create({ _id: inArch._id, ...inArch.toObject(), ...data, archived_at: null });
         await Arch.findByIdAndDelete(inArch._id);
+<<<<<<< HEAD
         await maybeUpsertInterview(restored, kind);
+=======
+
+        await ActivityEvent.create({
+          actorId: data.lastModifiedById,
+          actorName: data.lastModifiedByName,
+          actorEmail: data.lastModifiedByEmail,
+          actorRole: data.lastModifiedByRole,
+          type: 'student_restore',
+          description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} restored a student record from archive.`,
+        });
+
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
         return res.json({ doc: { _id: inArch._id } });
       }
     }
     const duplicate = nameSignature ? await Live.findOne(dupFilter).lean() : null;
     if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
     const created = await Live.create(id ? { _id: id, ...data, archived_at: null } : { ...data, archived_at: null });
+<<<<<<< HEAD
     await maybeUpsertInterview(created, kind);
+=======
+
+    await ActivityEvent.create({
+      actorId: data.lastModifiedById,
+      actorName: data.lastModifiedByName,
+      actorEmail: data.lastModifiedByEmail,
+      actorRole: data.lastModifiedByRole,
+      type: 'student_add',
+      description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} added a student record.`,
+    });
+
+>>>>>>> 9eb98ddd5483a3d875628b0b3484e9c25f4f4809
     res.json({ doc: created.toObject() });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -265,6 +397,21 @@ export async function remove(req, res, next) {
           record_category: String(student && (student.recordCategory || ''))
         }
       })
+    } catch (_) {}
+
+    try {
+      const actorId = req.user && req.user.id;
+      const actorRole = req.user && req.user.role;
+      const actorName = (req.user && req.user.name) || '';
+      const actorEmail = (req.user && req.user.email) || '';
+      await ActivityEvent.create({
+        actorId,
+        actorName: actorName || undefined,
+        actorEmail: actorEmail || undefined,
+        actorRole,
+        type: 'student_delete',
+        description: `${actorName || actorEmail || 'Someone'} deleted a student record.`,
+      });
     } catch (_) {}
     res.json({ ok: true });
   } catch (e) {

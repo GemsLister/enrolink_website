@@ -535,8 +535,8 @@ export default function OfficerDashboard() {
       <aside className="hidden lg:block w-80 shrink-0">
         <OfficerSidebar />
       </aside>
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
-        <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 min-h-[100dvh] overflow-y-auto">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] h-[100dvh]">
+        <main className="bg-[#f7f1f2] px-4 py-6 sm:px-6 lg:px-10 lg:py-8 h-full overflow-y-auto">
           <div className="lg:hidden mb-3">
             <button onClick={() => setMobileOpen(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Menu</button>
           </div>
@@ -977,7 +977,7 @@ export default function OfficerDashboard() {
             </section>
           )}
         </main>
-        <aside className="bg-[#fbf3f4] px-4 py-6 sm:px-6 lg:px-6 lg:py-8 lg:border-l lg:border-[#efccd2]">
+        <aside className="bg-[#fbf3f4] px-4 py-6 sm:px-6 lg:px-6 lg:py-8 lg:border-l lg:border-[#efccd2] h-full overflow-y-auto">
           {/* Simplified right column for officers; mirrors head */}
           <div className="rounded-3xl bg-gradient-to-b from-[#efc4cd] to-[#f5d8de] p-5 shadow-[0_14px_28px_rgba(139,23,47,0.08)]">
             <div className="flex items-center justify-between">

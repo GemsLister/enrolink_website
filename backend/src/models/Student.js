@@ -44,7 +44,12 @@ const StudentSchema = new mongoose.Schema(
     remarks: String,
     interviewId: { type: mongoose.Schema.Types.ObjectId, ref: 'Interview' },
     nameSignature: { type: String, index: true },
-    archived_at: { type: String, default: undefined }
+    archived_at: { type: String, default: undefined },
+    // Audit fields: who last modified this record (head or officer)
+    lastModifiedById: { type: mongoose.Schema.Types.ObjectId, required: false },
+    lastModifiedByName: { type: String, required: false },
+    lastModifiedByEmail: { type: String, required: false },
+    lastModifiedByRole: { type: String, required: false },
   },
   { timestamps: true, optimisticConcurrency: true }
 );

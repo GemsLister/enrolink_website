@@ -526,9 +526,9 @@ export default function Dashboard() {
       </aside>
 
       {/* Main + Right column */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px]">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] h-[100dvh]">
         {/* Main content */}
-        <main className="bg-[#f7f1f2] px-4 sm:px-10 py-6 sm:py-8 min-h-[100dvh] overflow-y-auto">
+        <main className="bg-[#f7f1f2] px-4 sm:px-10 py-6 sm:py-8 h-full overflow-y-auto">
           <div className="lg:hidden mb-3">
             <button onClick={() => setMobileOpen(true)} className="h-9 rounded-md bg-[#8a1d35] text-white text-[13px] font-semibold px-4">Menu</button>
           </div>
@@ -1039,7 +1039,7 @@ export default function Dashboard() {
         </main>
 
         {/* Right column */}
-        <aside className="border-l border-[#efccd2] bg-[#fbf3f4] px-6 py-8">
+        <aside className="border-l border-[#efccd2] bg-[#fbf3f4] px-6 py-8 h-full overflow-y-auto">
           <div className="rounded-3xl bg-gradient-to-b from-[#efc4cd] to-[#f5d8de] p-5 shadow-[0_14px_28px_rgba(139,23,47,0.08)] relative">
             {/* Top bar: left search, right bell + name + caret */}
             <div className="flex items-center justify-start">

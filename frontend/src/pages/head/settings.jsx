@@ -17,7 +17,15 @@ export default function Settings() {
   const [err, setErr] = useState('')
   const [officers, setOfficers] = useState([])
   const [selectedOfficerId, setSelectedOfficerId] = useState('')
-  const [perms, setPerms] = useState({ validateRequirements: false, editProfiles: false, processEnrollment: false, manageSchedule: false, generateReports: false, viewRecordsAllPrograms: false })
+  const [perms, setPerms] = useState({
+    createRecords: false,
+    editRecords: false,
+    processEnrollment: false,
+    archiveRecords: false,
+    manageSchedule: false,
+    generateReports: false,
+    viewRecordsAllPrograms: false,
+  })
 
   useEffect(() => {
     let mounted = true
@@ -44,22 +52,26 @@ export default function Settings() {
     let active = true
     async function loadOfficers() {
       try {
+        // Only department heads should ever load the officers list
+        if (!token || !user || user.role !== 'DEPT_HEAD') return
         const res = await api.get('/officers')
         if (active) setOfficers(res.rows || [])
       } catch (_) { if (active) setOfficers([]) }
     }
-    if (token) loadOfficers()
+    loadOfficers()
     return () => { active = false }
-  }, [api, token])
+  }, [api, token, user])
 
   function selectOfficer(id) {
     setSelectedOfficerId(id)
     const o = officers.find(x => String(x._id || x.id) === String(id))
     const p = (o && o.permissions) || {}
+    const legacyEditProfiles = !!p.editProfiles
     setPerms({
-      validateRequirements: !!p.validateRequirements,
-      editProfiles: !!p.editProfiles,
+      createRecords: p.createRecords != null ? !!p.createRecords : legacyEditProfiles,
+      editRecords: p.editRecords != null ? !!p.editRecords : legacyEditProfiles,
       processEnrollment: !!p.processEnrollment,
+      archiveRecords: !!p.archiveRecords,
       manageSchedule: !!p.manageSchedule,
       generateReports: !!p.generateReports,
       viewRecordsAllPrograms: !!p.viewRecordsAllPrograms,
@@ -199,16 +211,21 @@ export default function Settings() {
               {selectedOfficerId && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {[
-                    { key: 'validateRequirements', label: 'Validate requirements' },
-                    { key: 'editProfiles', label: 'Encode/update profiles' },
-                    { key: 'processEnrollment', label: 'Process enrollment (approve/return/hold)' },
+                    { key: 'createRecords', label: 'Add applicants & students' },
+                    { key: 'editRecords', label: 'Edit record details' },
+                    { key: 'processEnrollment', label: 'Move between Applicant / Enrollee / Student' },
+                    { key: 'archiveRecords', label: 'Archive / restore records' },
                     { key: 'manageSchedule', label: 'Manage schedule and subjects' },
-                    { key: 'generateReports', label: 'Generate enrollment reports' },
-                    { key: 'viewRecordsAllPrograms', label: 'View records across programs' },
+                    { key: 'generateReports', label: 'Export records to PDF' },
+                    { key: 'viewRecordsAllPrograms', label: 'Import using XLSX' },
                   ].map(item => (
                     <label key={item.key} className="flex items-center justify-between rounded-2xl px-4 py-3 border border-rose-200">
                       <span className="text-sm font-medium text-[#5b1a30]">{item.label}</span>
-                      <button type="button" onClick={()=>setPerms(p=>({ ...p, [item.key]: !p[item.key] }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${perms[item.key]?'bg-[#c4375b]':'bg-gray-300'}`}>
+                      <button
+                        type="button"
+                        onClick={()=>setPerms(p=>({ ...p, [item.key]: !p[item.key] }))}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${perms[item.key]?'bg-[#c4375b]':'bg-gray-300'}`}
+                      >
                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${perms[item.key]?'translate-x-5':'translate-x-1'}`} />
                       </button>
                     </label>

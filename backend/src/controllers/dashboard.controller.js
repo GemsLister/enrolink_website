@@ -4,6 +4,8 @@ import { getBatchModel } from '../models/Batch.js';
 import { getInterviewModel } from '../models/Interview.js';
 import { getOfficerUserModel } from '../models/User.js';
 import HeadUser from '../models/HeadUser.js';
+import LoginEvent from '../models/LoginEvent.js';
+import ActivityEvent from '../models/ActivityEvent.js';
 import { statsFromBigQuery } from '../services/google/bigquery.js';
 
 export async function stats(req, res, next) {
@@ -187,16 +189,22 @@ export async function stats(req, res, next) {
 
 export async function activity(req, res, next) {
   try {
-    const Student = getStudentModel();
-    const Batch = getBatchModel();
     const OfficerUser = getOfficerUserModel();
 
-    const year = req.query.year ? String(req.query.year) : '';
-    let batchIds = undefined;
-    if (year) {
-      const batchesOfYear = await Batch.find({ year }).select('_id').lean();
-      batchIds = batchesOfYear.map(b => b._id);
-    }
+    // Explicit audit events written from students.controller (add/edit/move/archive/delete)
+    let studentEvents = [];
+    try {
+      const auditRows = await ActivityEvent.find({})
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .lean();
+      studentEvents = auditRows.map((ev) => ({
+        id: String(ev._id),
+        actor: ev.actorName || ev.actorEmail || 'Someone',
+        action: ev.description || 'updated a student record.',
+        when: ev.createdAt,
+      }));
+    } catch (_) {}
 
     const match = year
       ? (batchIds && batchIds.length
@@ -239,6 +247,10 @@ export async function activity(req, res, next) {
 
     const oMatch = year ? { role: 'OFFICER', assignedYear: year } : { role: 'OFFICER' };
     const oRows = await OfficerUser.find(oMatch)
+
+    // Recent officer signups across all years
+    const oRows = await OfficerUser.find({ role: 'OFFICER' })
+
       .sort({ createdAt: -1 })
       .limit(10)
       .select('name email createdAt updatedAt')
@@ -267,7 +279,28 @@ export async function activity(req, res, next) {
       }
     } catch (_) {}
 
-    const combined = [...studentEvents, ...officerEvents].sort((a, b) => {
+    // Recent login events (basic audit of head/officer logins)
+    let loginEvents = [];
+    try {
+      const loginRows = await LoginEvent.find({})
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+      loginEvents = loginRows.map((ev) => {
+        const who = (ev.email || ev.role || 'User').toString();
+        let action = 'logged in.';
+        if (ev.role === 'DEPT_HEAD') action = 'Department Head logged in.';
+        if (ev.role === 'OFFICER') action = 'Enrollment Officer logged in.';
+        return {
+          id: String(ev._id || `${who}-${ev.createdAt}`),
+          actor: who,
+          action,
+          when: ev.createdAt,
+        };
+      });
+    } catch (_) {}
+
+    const combined = [...studentEvents, ...officerEvents, ...loginEvents].sort((a, b) => {
       const ta = new Date(a.when).getTime();
       const tb = new Date(b.when).getTime();
       return tb - ta;

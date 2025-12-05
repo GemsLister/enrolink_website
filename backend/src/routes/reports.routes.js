@@ -5,7 +5,7 @@ import { auth, requireAnyRole, requireOfficerPermission } from '../middleware/au
 const r = Router();
 
 r.get('/', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.list);
-r.get('/pdf', auth, requireAnyRole('DEPT_HEAD','OFFICER'), ctrl.pdf);
+r.get('/pdf', auth, requireAnyRole('DEPT_HEAD','OFFICER'), requireOfficerPermission('generateReports'), ctrl.pdf);
 r.post('/records', auth, requireAnyRole('DEPT_HEAD','OFFICER'), requireOfficerPermission('generateReports'), ctrl.createRecord);
 r.post('/import', auth, requireAnyRole('DEPT_HEAD','OFFICER'), requireOfficerPermission('generateReports'), ctrl.importFromSheets);
 r.delete('/:id', auth, requireAnyRole('DEPT_HEAD','OFFICER'), requireOfficerPermission('generateReports'), ctrl.remove);

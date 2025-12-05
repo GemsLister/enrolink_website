@@ -10,8 +10,12 @@ export async function ensureAdmin() {
   if (existing) {
     if (existing.role !== 'DEPT_HEAD') {
       existing.role = 'DEPT_HEAD';
-      await existing.save();
     }
+    const passwordMatches = await bcrypt.compare(password, existing.passwordHash || '');
+    if (!passwordMatches) {
+      existing.passwordHash = await bcrypt.hash(password, 10);
+    }
+    await existing.save();
     return;
   }
   const passwordHash = await bcrypt.hash(password, 10);
