@@ -1,3 +1,4 @@
+import { getRecordModel } from '../models/Record.js';
 import { getStudentModel } from '../models/Student.js';
 import { getBatchModel } from '../models/Batch.js';
 import { getInterviewModel } from '../models/Interview.js';
@@ -17,7 +18,9 @@ export async function stats(req, res, next) {
       return res.json(data);
     }
 
-    const Student = getStudentModel();
+    const Applicants = getRecordModel('applicants');
+    const StudentsRec = getRecordModel('students');
+    const EnrolleesRec = getRecordModel('enrollees');
     const Batch = getBatchModel();
   const Interview = getInterviewModel();
 
@@ -27,24 +30,29 @@ export async function stats(req, res, next) {
       batchIds = batchesOfYear.map(b => b._id);
     }
 
-    // Year filter: prefer batchId list, but also support Student.batch string year fallback
+    // Year filter: prefer batchId list, but also support Record.batch string year fallback
     const match = year
       ? (batchIds && batchIds.length
           ? { $or: [ { batchId: { $in: batchIds } }, { batch: year } ] }
           : { batch: year })
       : {};
 
-    const total = await Student.countDocuments(match);
-    let interviewed = await Student.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
-    let passed = await Student.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
-    const enrolled = await Student.countDocuments({ ...match, status: 'ENROLLED' });
-    const awol = await Student.countDocuments({ ...match, status: 'AWOL' });
+    const totalApplicants = await Applicants.countDocuments(match);
+    const interviewedApplicants = await Applicants.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    const passedApplicants = await Applicants.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
+    const totalEnrollees = await EnrolleesRec.countDocuments(match);
+    const interviewedEnrollees = await EnrolleesRec.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    const passedEnrollees = await EnrolleesRec.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
+    const interviewedStudents = await StudentsRec.countDocuments({ ...match, status: { $in: ['INTERVIEWED', 'PASSED', 'FAILED', 'ENROLLED'] } });
+    const passedStudents = await StudentsRec.countDocuments({ ...match, status: { $in: ['PASSED', 'ENROLLED'] } });
+    const enrolled = await StudentsRec.countDocuments({ ...match, status: 'ENROLLED' });
+    const awol = await StudentsRec.countDocuments({ ...match, status: 'AWOL' });
 
     const ivFilter = year ? { batch: year } : {};
     const interviewedFromIv = await Interview.countDocuments(ivFilter);
     const passedFromIv = await Interview.countDocuments({ ...ivFilter, result: 'PASSED' });
-    interviewed = Math.max(interviewed, interviewedFromIv);
-    passed = Math.max(passed, passedFromIv);
+    const interviewed = interviewedApplicants;
+    const passed = passedApplicants;
 
     // Batch analytics: count students per batch for selected year
     let batchAnalytics = [];
@@ -54,7 +62,7 @@ export async function stats(req, res, next) {
         .sort({ index: 1 })
         .select('code index')
         .lean();
-      const counts = await Student.aggregate([
+      const counts = await StudentsRec.aggregate([
         { $match: { batchId: { $in: batchIds } } },
         { $group: { _id: '$batchId', count: { $sum: 1 } } },
       ]);
@@ -62,19 +70,19 @@ export async function stats(req, res, next) {
       batchAnalytics = batches.map(b => ({ code: b.code, count: countsMap.get(String(b._id)) || 0 }));
     }
 
-    const base = interviewed || total || 0;
+    const basePie = interviewedEnrollees || totalEnrollees || 0;
     const pie = [
       ['Result', 'Percent'],
-      ['Passed', base ? Math.min(100, Math.round((passed / base) * 100)) : 0],
-      ['Failed', base ? Math.max(0, 100 - Math.min(100, Math.round((passed / base) * 100))) : 100],
+      ['Passed', basePie ? Math.min(100, Math.round((passedEnrollees / basePie) * 100)) : 0],
+      ['Failed', basePie ? Math.max(0, 100 - Math.min(100, Math.round((passedEnrollees / basePie) * 100))) : 100],
     ];
     const column = [
       ['Batch', 'Count'],
       ...batchAnalytics.map(b => [String(b.code || ''), Number(b.count || 0)]),
     ];
 
-    // Additional charts: passers by SHS strand and confirmed interviewees distribution by percentile
-    const students = await Student.find(match)
+    // Additional charts (course-specific): base on Enrollees records
+    const enrollees = await EnrolleesRec.find(match)
       .select('firstName lastName course preferredCourse shsStrand interviewerDecision interviewDate percentileScore finalScore status')
       .lean();
     const classifyCourse = (s) => {
@@ -84,7 +92,7 @@ export async function stats(req, res, next) {
       return 'OTHER';
     };
     const byCourse = { EMC: [], IT: [] };
-    for (const s of students) {
+    for (const s of enrollees) {
       const k = classifyCourse(s);
       if (k === 'EMC') byCourse.EMC.push(s);
       else if (k === 'IT') byCourse.IT.push(s);
@@ -165,7 +173,7 @@ export async function stats(req, res, next) {
     const itConfirmedByPercentile = buildConfirmedByPercentile(byCourse.IT);
 
     res.json({
-      totals: { totalApplicants: total, interviewed, passedInterview: passed, enrolled, awol },
+      totals: { totalApplicants, interviewed, passedInterview: passed, enrolled, awol },
       batchAnalytics,
       charts: {
         passRatePie: pie,

@@ -3,6 +3,8 @@ import Schedule from '../models/Schedule.js';
 import Event from '../models/Event.js';
 import mongoose from 'mongoose';
 import { google } from 'googleapis';
+import { getRecordModel } from '../models/Record.js';
+import { getOfficerUserModel } from '../models/User.js';
 
 async function fetchDatabaseEvents(userId, { timeMin, timeMax }) {
   if (!userId) return [];
@@ -214,6 +216,47 @@ export async function list(req, res, next) {
           console.error('Error fetching database events:', dbError);
         }
       }
+      let interviewEvents = [];
+      try {
+        const Applicants = getRecordModel('applicants', false);
+        const StudentsRec = getRecordModel('students', false);
+        const q = {};
+        if (req.user && req.user.role === 'OFFICER') {
+          try {
+            const OfficerUser = getOfficerUserModel();
+            const off = await OfficerUser.findById(userId).lean();
+            if (off?.assignedYear) q.batch = off.assignedYear;
+          } catch (_) {}
+        }
+        const rowsA = await Applicants.find({ ...q, interviewDate: { $exists: true, $ne: '' } }).select('firstName lastName interviewDate').lean();
+        const rowsS = await StudentsRec.find({ ...q, interviewDate: { $exists: true, $ne: '' } }).select('firstName lastName interviewDate').lean();
+        const within = (dt) => {
+          const s = timeMin ? new Date(timeMin) : null;
+          const e = timeMax ? new Date(timeMax) : null;
+          if (s && !isNaN(s) && dt < s) return false;
+          if (e && !isNaN(e) && dt >= e) return false;
+          return true;
+        };
+        const parse = (v) => {
+          const txt = String(v || '').trim();
+          if (!txt) return null;
+          const d = new Date(txt);
+          if (!isNaN(d)) return d;
+          const m = txt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+          return null;
+        };
+        const mapRows = (rows) => rows.map(r => {
+          const dt = parse(r.interviewDate);
+          if (!dt || !within(dt)) return null;
+          const dateStr = dt.toISOString().split('T')[0];
+          const title = `${r.firstName || ''} ${r.lastName || ''}`.trim() || 'Interview';
+          return { id: `rec_${dateStr}_${title.replace(/\s+/g,'_')}_${Math.random().toString(36).slice(2)}`, summary: title, description: '', start: { date: dateStr }, end: { date: dateStr }, htmlLink: null, source: 'records' };
+        }).filter(Boolean);
+        interviewEvents = [...mapRows(rowsA), ...mapRows(rowsS)];
+      } catch (e) {
+        console.error('Error building interview events:', e);
+      }
       
       // Create a map of Google Calendar events by ID for quick lookup
       const googleEventMap = new Map();
@@ -248,11 +291,16 @@ export async function list(req, res, next) {
       }
       
       // Add database-only events that don't exist in Google Calendar
-      // (Events without googleEventId remain visible even if not in Google, e.g., offline or failed sync)
       dbEvents.forEach(dbEvent => {
         if (dbEvent.id && !googleEventMap.has(dbEvent.id)) {
           // Event exists in database but not in Google Calendar - include it
           googleEventMap.set(dbEvent.id, dbEvent);
+        }
+      });
+      interviewEvents.forEach(recEv => {
+        const key = recEv.id;
+        if (key && !googleEventMap.has(key)) {
+          googleEventMap.set(key, recEv);
         }
       });
       
@@ -402,24 +450,12 @@ export async function remove(req, res, next) {
     }
   }
   
-  // Delete from database
-  // If we found the event earlier, use its _id directly for most reliable deletion
+  // Archive in database by setting hidden=true (do not hard-delete)
+  // If we found the event earlier, use its _id directly for most reliable update
   if (dbEvent && dbEvent._id) {
     try {
-        if (deletedFromGoogle || !appliedHidden) {
-          console.log(`Deleting event from database using found _id: ${dbEvent._id}`);
-          const deleteResult = await Event.deleteOne({ _id: dbEvent._id });
-          console.log(`Delete result:`, deleteResult);
-          deletedFromDatabase = deleteResult.deletedCount > 0;
-          if (deletedFromDatabase) {
-            console.log(`✅ Successfully deleted event ${dbEvent._id} from database`);
-          } else {
-            console.warn(`⚠️ Event ${dbEvent._id} not found for deletion (may have been already deleted)`);
-          }
-        } else {
-          await Event.updateOne({ _id: dbEvent._id }, { $set: { hidden: true } });
-          deletedFromDatabase = true;
-        }
+        await Event.updateOne({ _id: dbEvent._id }, { $set: { hidden: true } });
+        deletedFromDatabase = true;
     } catch (dbError) {
       console.error('❌ Error deleting event from database by _id:', dbError);
       throw dbError;
@@ -436,29 +472,27 @@ export async function remove(req, res, next) {
       
       if (deleteConditions.length) {
         try {
-          console.log(`Attempting to delete event from database with conditions:`, deleteConditions);
+          console.log(`Archiving event in database with conditions:`, deleteConditions);
           let deleteResult = null;
 
           // First try with user filter if userId is available
           if (userId) {
-            deleteResult = await Event.deleteOne({
+            deleteResult = await Event.updateOne({
               user: userId,
               $or: deleteConditions,
-            });
-            console.log(`Delete with user filter result:`, deleteResult);
-            if (deleteResult.deletedCount > 0) {
-              deletedFromDatabase = true;
-            }
+            }, { $set: { hidden: true } });
+            console.log(`Archive with user filter result:`, deleteResult);
+            if (deleteResult.modifiedCount > 0) deletedFromDatabase = true;
           }
 
           // If no deletion happened with user filter, try without user filter
           // This handles cases where events might be shared or user doesn't match
           if (!deletedFromDatabase) {
-            deleteResult = await Event.deleteOne({
+            deleteResult = await Event.updateOne({
               $or: deleteConditions,
-            });
-            console.log(`Delete without user filter result:`, deleteResult);
-            deletedFromDatabase = deleteResult.deletedCount > 0;
+            }, { $set: { hidden: true } });
+            console.log(`Archive without user filter result:`, deleteResult);
+            deletedFromDatabase = deleteResult.modifiedCount > 0;
           }
 
           if (!deletedFromDatabase) {
@@ -466,17 +500,17 @@ export async function remove(req, res, next) {
               console.warn(`⚠️ Event not found in database; applied hidden suppression`);
               deletedFromDatabase = true;
             } else {
-              console.warn(`⚠️ Event not found in database for deletion. Conditions:`, deleteConditions);
+              console.warn(`⚠️ Event not found in database for archive. Conditions:`, deleteConditions);
             }
           } else {
-            console.log(`✅ Successfully deleted event from database`);
+            console.log(`✅ Successfully archived event in database`);
           }
         } catch (dbError) {
-          console.error('❌ Error deleting event from database:', dbError);
+          console.error('❌ Error archiving event in database:', dbError);
           throw dbError;
         }
       } else {
-        console.warn(`⚠️ No delete conditions generated. ID: ${id}, googleEventIdToDelete: ${googleEventIdToDelete}, possibleDbId: ${possibleDbId}`);
+        console.warn(`⚠️ No archive conditions generated. ID: ${id}, googleEventIdToDelete: ${googleEventIdToDelete}, possibleDbId: ${possibleDbId}`);
       }
     }
     
@@ -484,7 +518,7 @@ export async function remove(req, res, next) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    return res.json({ ok: true, deletedFrom: { google: deletedFromGoogle, database: deletedFromDatabase } });
+    return res.json({ ok: true, archived: true, sources: { googleDeleted: deletedFromGoogle, dbArchived: deletedFromDatabase } });
   } catch (e) {
     const status = e?.response?.status || e?.code === 401 ? 401 : (e?.code === 403 ? 403 : 500);
     const message = e?.response?.data?.error?.message || e?.message || 'Calendar error';
