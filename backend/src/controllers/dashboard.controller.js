@@ -190,15 +190,21 @@ export async function stats(req, res, next) {
 export async function activity(req, res, next) {
   try {
     const OfficerUser = getOfficerUserModel();
-
-    // Explicit audit events written from students.controller (add/edit/move/archive/delete)
-    let studentEvents = [];
+    const Student = getStudentModel();
+    const Batch = getBatchModel();
+    const year = req.query.year ? String(req.query.year) : '';
+    let batchIds = undefined;
+    if (year) {
+      const batchesOfYear = await Batch.find({ year }).select('_id code index').lean();
+      batchIds = batchesOfYear.map(b => b._id);
+    }
+    let auditEvents = [];
     try {
       const auditRows = await ActivityEvent.find({})
         .sort({ createdAt: -1 })
         .limit(40)
         .lean();
-      studentEvents = auditRows.map((ev) => ({
+      auditEvents = auditRows.map((ev) => ({
         id: String(ev._id),
         actor: ev.actorName || ev.actorEmail || 'Someone',
         action: ev.description || 'updated a student record.',
@@ -215,10 +221,10 @@ export async function activity(req, res, next) {
     const rows = await Student.find(match)
       .sort({ updatedAt: -1 })
       .limit(20)
-      .select('firstName lastName status updatedAt createdAt')
+      .select('firstName lastName status interviewer updatedAt createdAt')
       .lean();
 
-    const studentEvents = rows.map(s => {
+    const studentEventsDerived = rows.map(s => {
       const created = new Date(s.createdAt).getTime();
       const updated = new Date(s.updatedAt).getTime();
       const isAdded = Math.abs(updated - created) < 5000;
@@ -247,10 +253,6 @@ export async function activity(req, res, next) {
 
     const oMatch = year ? { role: 'OFFICER', assignedYear: year } : { role: 'OFFICER' };
     const oRows = await OfficerUser.find(oMatch)
-
-    // Recent officer signups across all years
-    const oRows = await OfficerUser.find({ role: 'OFFICER' })
-
       .sort({ createdAt: -1 })
       .limit(10)
       .select('name email createdAt updatedAt')
@@ -300,7 +302,7 @@ export async function activity(req, res, next) {
       });
     } catch (_) {}
 
-    const combined = [...studentEvents, ...officerEvents, ...loginEvents].sort((a, b) => {
+    const combined = [...auditEvents, ...studentEventsDerived, ...officerEvents, ...loginEvents].sort((a, b) => {
       const ta = new Date(a.when).getTime();
       const tb = new Date(b.when).getTime();
       return tb - ta;
