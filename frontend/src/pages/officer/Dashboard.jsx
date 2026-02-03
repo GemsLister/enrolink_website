@@ -987,7 +987,7 @@ export default function OfficerDashboard() {
                   placeholder="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-8 w-full rounded-full bg-white pl-8 pr-3 text-[13px] text-[#2f2b33] placeholder:text-[#8c7f86] outline-none focus:outline-none focus-visible:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]"
+                  className="h-8 w-full rounded-full bg-white pl-10 pr-3 text-[13px] text-[#2f2b33] placeholder:text-[#8c7f86] outline-none focus:outline-none focus-visible:outline-none shadow-[inset_0_0_0_1px_#efccd2] focus:shadow-[inset_0_0_0_2px_#cfa3ad]"
                 />
                 <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
                   <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#8a1d35] border border-[#efccd2]">
@@ -1122,39 +1122,6 @@ export default function OfficerDashboard() {
                 </div>
               </div>
             )}
-          </div>
-          <div className="mt-8">
-            <h2 className="text-sm font-bold text-[#7d102a]">Recent Activity</h2>
-            <div className="mt-4 flex flex-col gap-4 pr-2 max-h-[560px] overflow-y-auto">
-              {activities
-                .filter((a) => {
-                  const q = searchQuery.trim().toLowerCase()
-                  if (!q) return true
-                  return a.actor.toLowerCase().includes(q) || a.action.toLowerCase().includes(q)
-                })
-                .map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(139,23,47,0.08)] border border-[#efccd2]"
-                  >
-                    {(() => {
-                      const a = String(activity.action || '').toLowerCase()
-                      const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon))
-                      return (
-                        <div className="flex items-center justify-center rounded-full w-12 h-12 bg-[#f0d9dd]">
-                          <img src={src} alt="" className="w-6 h-6" />
-                        </div>
-                      )
-                    })()}
-                    <div className="text-sm leading-relaxed text-[#7d102a]">
-                      <p>
-                        <span className="font-semibold">{activity.actor}</span> {activity.action}
-                      </p>
-                      <p className="text-xs text-[#a86a74]">{new Date(activity.when).toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))}
-            </div>
           </div>
         </aside>
       </div>

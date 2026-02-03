@@ -368,39 +368,52 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   
     const showSyncBtn = String(import.meta.env.VITE_ENABLE_CALENDAR_SYNC_BUTTON || '').toLowerCase() === 'true'
     return (
-      <div className="rbc-toolbar p-5">
-        <div className="rbc-btn-group" style={{ marginRight: 'auto' }}>
+      <div className="rbc-toolbar-custom flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        {/* Left: Today and Navigation */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => handleNavigate('TODAY')}
-            className="rbc-btn rbc-btn-today"
+            className="rbc-btn-today-custom px-3 py-1.5 rounded text-sm font-normal bg-white text-gray-500 hover:bg-gray-50 transition-colors border border-gray-300 outline-none"
           >
             Today
           </button>
-          <button
-            type="button"
-            onClick={() => handleNavigate('PREV')}
-            className="rbc-btn rbc-btn-nav"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => handleNavigate('NEXT')}
-            className="rbc-btn rbc-btn-nav"
-          >
-            ›
-          </button>
-          <span className="rbc-toolbar-label" style={{ marginLeft: '10px' }}>
+          <div className="rbc-nav-group rounded bg-white border border-gray-300 overflow-hidden flex items-center">
+            <button
+              type="button"
+              onClick={() => handleNavigate('PREV')}
+              className="rbc-btn-nav-custom w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors border-none outline-none bg-transparent border-r border-gray-300"
+              aria-label="Previous period"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('NEXT')}
+              className="rbc-btn-nav-custom w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors border-none outline-none bg-transparent"
+              aria-label="Next period"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+
+        {/* Center: Month/Year Label */}
+        <div className="flex-1 flex justify-center">
+          <span className="rbc-toolbar-label-custom text-lg font-bold text-gray-900">
             {label}
           </span>
         </div>
+
+        {/* Right: View Buttons */}
         <div className="rbc-btn-group">
-          {['month', 'week', 'day'].map((v) => (
+          {['month', 'week', 'day'].map((v, index) => (
             <button
               key={v}
               type="button"
-              className={`rbc-btn ${view === v ? 'rbc-active' : ''}`}
+              className={`rbc-btn-view-custom px-3 py-1.5 text-sm font-normal transition-colors ${
+                view === v ? 'rbc-view-active' : ''
+              }`}
               onClick={() => onView(v)}
             >
               {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -409,9 +422,8 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
           {showSyncBtn && (
             <button
               type="button"
-              className="rbc-btn"
+              className="rbc-btn px-3 py-1.5 rounded text-sm font-normal bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors ml-2 border-none outline-none"
               onClick={handleSync}
-              style={{ marginLeft: '8px' }}
             >
               Sync to Google
             </button>
@@ -422,9 +434,9 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   }
 
   return (
-    <div style={{ height: '500px', padding: '20px' }}>
+    <div className="calendar-container bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden" style={{ height: '520px' }}>
       {error && (
-        <div className="error-message" style={{ color: 'red', marginBottom: '10px' }}>
+        <div className="error-message px-4 py-2" style={{ color: 'red', marginBottom: '10px' }}>
           {error}
         </div>
       )}

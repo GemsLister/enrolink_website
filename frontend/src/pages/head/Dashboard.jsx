@@ -494,11 +494,11 @@ export default function Dashboard() {
     awol: 0,
   };
   const summaryCards = [
-    { key: 'applicants', label: "Applicants", value: totals.totalApplicants },
-    { key: 'interviewed', label: "Interviewed Applicants", value: totals.interviewed },
-    { key: 'enrolled_bsit', label: "Enrolled — BSIT", value: bsitEnrolledCount },
-    { key: 'enrolled_bsemc', label: "Enrolled — BSEMC", value: bsemcEnrolledCount },
-    { key: 'enrolled_all', label: "Enrolled — All Programs", value: (bsitEnrolledCount + bsemcEnrolledCount) },
+    { key: 'applicants', label: 'Total Applicant', value: totals.totalApplicants },
+    { key: 'interviewed', label: 'Interviewed', value: totals.interviewed },
+    { key: 'enrolled_bsit', label: 'Enrolled BSIT', value: bsitEnrolledCount },
+    { key: 'enrolled_bsemc', label: 'Enrolled BSEMC', value: bsemcEnrolledCount },
+    { key: 'enrolled_all', label: 'Enrolled All Students', value: (bsitEnrolledCount + bsemcEnrolledCount) },
   ];
 
   const batches = stats.batchAnalytics || [];
@@ -580,11 +580,11 @@ export default function Dashboard() {
             </label>
           </p>
 
-          <div className="mt-6 grid grid-flow-col auto-cols-max gap-4 overflow-x-auto">
+          <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {summaryCards.map((card) => (
               <div
-                key={card.key}
-                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40 min-w-[220px]"
+                key={card.label}
+                className="rounded-xl bg-white px-5 py-5 shadow-[0_10px_18px_rgba(139,23,47,0.08)] border border-[#efccd2] flex flex-col items-center justify-between overflow-hidden h-40"
               >
                 <div className="flex items-center justify-center rounded-full w-11 h-11 bg-[#f2c6cf]">
                   {(() => {
@@ -599,7 +599,7 @@ export default function Dashboard() {
                     return <img src={src} alt="" className="w-6 h-6" />;
                   })()}
                 </div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-[#a86a74] leading-4 text-center break-words whitespace-normal max-w-[12rem]">
+                <div className="text-[10px] uppercase tracking-[0.22em] text-[#a86a74] leading-4 text-center break-words whitespace-normal max-w-[8rem]">
                   {card.label}
                 </div>
                 {loading ? (
@@ -611,7 +611,7 @@ export default function Dashboard() {
                 )}
               </div>
             ))}
-          </div>
+          </section>
 
           {activeTab === 'overview' && (
           <>
@@ -1213,13 +1213,18 @@ export default function Dashboard() {
             </h2>
             <div className="mt-4 flex flex-col gap-4 pr-2 max-h-[560px] overflow-y-auto">
               {activities
+                // Fully remove simple "logged in" entries from the Recent Activity list
+                .filter((a) => !String(a.action || '').toLowerCase().includes('logged in'))
                 .filter((a) => {
                   const q = searchQuery.trim().toLowerCase();
                   if (!q) return true;
+                  const actor = String(a.actor || '').toLowerCase();
+                  const action = String(a.action || '').toLowerCase();
+                  const whenText = timeAgo(a.when).toLowerCase();
                   return (
-                    a.actor.toLowerCase().includes(q) ||
-                    a.action.toLowerCase().includes(q) ||
-                    timeAgo(a.when).toLowerCase().includes(q)
+                    actor.includes(q) ||
+                    action.includes(q) ||
+                    whenText.includes(q)
                   );
                 })
                 .map((activity) => (
@@ -1234,8 +1239,13 @@ export default function Dashboard() {
                     })()}
                     <div className="text-sm leading-relaxed text-[#7d102a]">
                       <p>
-                        <span className="font-semibold">{activity.actor}</span>{" "}
-                        {activity.action}
+                        <span className="font-semibold">{activity.actor}</span>
+                        {activity.action && (
+                          <>
+                            {" "}
+                            {activity.action}
+                          </>
+                        )}
                       </p>
                       <p className="text-xs text-[#a86a74]">
                         {timeAgo(activity.when)}

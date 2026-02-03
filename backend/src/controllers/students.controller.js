@@ -32,8 +32,6 @@ export async function list(req, res, next) {
     } else {
       q.archived_at = { $ne: null };
     }
-
-    // RBAC: Officers without viewRecordsAllPrograms can only view their assigned scope
     if (req.user && req.user.role === 'OFFICER') {
       try {
         const { getOfficerUserModel } = await import('../models/User.js');
@@ -201,7 +199,7 @@ export async function upsert(req, res, next) {
       const duplicate = nameSignature ? await Arch.findOne(dupFilter).lean() : null;
       if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
       const created = await Arch.create(id ? { _id: id, ...data } : data);
-      // Audit log + interview summary update
+      await maybeUpsertInterview(created, kind);
       await ActivityEvent.create({
         actorId: data.lastModifiedById,
         actorName: data.lastModifiedByName,
@@ -210,7 +208,6 @@ export async function upsert(req, res, next) {
         type: 'student_archive',
         description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} archived a student record.`,
       });
-      await maybeUpsertInterview(created, kind);
       return res.json({ doc: created.toObject() });
     }
 
@@ -249,8 +246,7 @@ export async function upsert(req, res, next) {
           if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
           Object.assign(sourceDoc, data, { archived_at: null });
           await sourceDoc.save();
-
-          // Audit log + interview summary update
+          await maybeUpsertInterview(sourceDoc, kind);
           await ActivityEvent.create({
             actorId: data.lastModifiedById,
             actorName: data.lastModifiedByName,
@@ -261,7 +257,6 @@ export async function upsert(req, res, next) {
               ? `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} added a student record.`
               : `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} edited a student record.`,
           });
-          await maybeUpsertInterview(sourceDoc, kind);
           return res.json({ doc: sourceDoc.toObject() });
         }
         // Relocate across collections without duplicating
@@ -272,8 +267,7 @@ export async function upsert(req, res, next) {
         if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
         const relocated = await Live.create({ _id: sourceDoc._id, ...sourceDoc.toObject(), ...data, archived_at: null });
         await sourceModel.findByIdAndDelete(sourceDoc._id);
-
-        // Audit log + interview summary update
+        await maybeUpsertInterview(relocated, kind);
         await ActivityEvent.create({
           actorId: data.lastModifiedById,
           actorName: data.lastModifiedByName,
@@ -282,7 +276,6 @@ export async function upsert(req, res, next) {
           type: 'student_move',
           description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} moved a student record between categories.`,
         });
-        await maybeUpsertInterview(relocated, kind);
         return res.json({ doc: { _id: sourceDoc._id } });
       }
 
@@ -296,8 +289,7 @@ export async function upsert(req, res, next) {
         if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
         const restored = await Live.create({ _id: inArch._id, ...inArch.toObject(), ...data, archived_at: null });
         await Arch.findByIdAndDelete(inArch._id);
-
-        // Audit log + interview summary update
+        await maybeUpsertInterview(restored, kind);
         await ActivityEvent.create({
           actorId: data.lastModifiedById,
           actorName: data.lastModifiedByName,
@@ -306,15 +298,13 @@ export async function upsert(req, res, next) {
           type: 'student_restore',
           description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} restored a student record from archive.`,
         });
-        await maybeUpsertInterview(restored, kind);
         return res.json({ doc: { _id: inArch._id } });
       }
     }
     const duplicate = nameSignature ? await Live.findOne(dupFilter).lean() : null;
     if (duplicate) return res.status(409).json({ error: 'A record with the same full name already exists.' });
     const created = await Live.create(id ? { _id: id, ...data, archived_at: null } : { ...data, archived_at: null });
-
-    // Audit log + interview summary update
+    await maybeUpsertInterview(created, kind);
     await ActivityEvent.create({
       actorId: data.lastModifiedById,
       actorName: data.lastModifiedByName,
@@ -323,7 +313,6 @@ export async function upsert(req, res, next) {
       type: 'student_add',
       description: `${data.lastModifiedByName || data.lastModifiedByEmail || 'Someone'} added a student record.`,
     });
-    await maybeUpsertInterview(created, kind);
     res.json({ doc: created.toObject() });
   } catch (e) {
     // eslint-disable-next-line no-console

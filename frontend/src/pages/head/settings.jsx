@@ -149,7 +149,6 @@ export default function Settings() {
         <div className="min-h-0 flex flex-col px-10 pt-10 pb-8 space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
-              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
               <h1 className="text-4xl font-semibold text-[#5b1a30]">Settings</h1>
               <p className="text-base text-[#8b4a5d]">Manage your account and preferences</p>
             </div>

@@ -55,7 +55,6 @@ export default function ArchivePage() {
         <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
           <div className="flex justify-between items-start">
             <div>
-              <div className="uppercase tracking-[0.25em] text-sm text-[#5b1a30]">Records</div>
               <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Archive</h1>
               <p className="text-base text-[#5b1a30]">Archived officers and batches</p>
             </div>

@@ -217,7 +217,6 @@ export default function EnrollmentOfficers() {
           <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
           <div className="flex justify-between items-start">
             <div>
-              <div className="uppercase tracking-[0.25em] text-sm text-[#5b1a30]">Records</div>
               <h1 className="text-5xl font-bold text-red-900 mb-2 mt-1">Enrollment Officers</h1>
               <p className="text-base text-[#5b1a30]">List of current enrollment officers</p>
             </div>
