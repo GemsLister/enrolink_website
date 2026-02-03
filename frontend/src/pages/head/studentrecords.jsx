@@ -1304,8 +1304,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
         <div className="flex flex-col gap-6">
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="uppercase tracking-[0.4em] text-xs text-rose-400">Records</p>
+            <div className="flex items-center justify-end">
               <UserChip />
             </div>
             <h1 className="text-4xl font-semibold text-[#5b1a30]">{headerTitle}</h1>
@@ -1320,56 +1319,51 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               />
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {navLinks.map((link) => {
-              const isDatasetTab = link.key === 'enrollees' || link.key === 'applicants' || link.key === 'students'
-              const archiveActive = isArchiveView && link.key === 'archive'
-              const datasetActive = (isArchiveView && isDatasetTab && archiveType === link.key) || (!isArchiveView && view === link.key)
-              return (
-                <button
-                  key={link.key}
-                  type="button"
-                  onClick={() => {
-                    if (link.key === 'archive') {
-                      if (isArchiveView) {
-                        const dest = archiveType || 'applicants'
-                        navigate(`${basePath}/${dest}`)
-                      } else {
-                        const current = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
-                        navigate(`${basePath}/archive?type=${encodeURIComponent(current)}`)
-                      }
-                      return
-                    }
-                    if (isArchiveView && isDatasetTab) {
-                      navigate(`${basePath}/archive?type=${encodeURIComponent(link.key)}`)
-                    } else {
-                      navigate(link.href)
-                    }
-                  }}
-                  className={`rounded-full px-6 py-2 text-sm font-medium transition ${
-                    archiveActive
-                      ? 'bg-[#a62a49] text-white shadow-lg shadow-rose-200/60'
-                      : datasetActive
-                        ? 'bg-[#c4375b] text-white shadow-lg shadow-rose-200/60'
-                        : 'bg-white text-[#c4375b]'
-                  }`}
-                >
-                  {link.label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="flex items-center justify-between gap-4 min-h-[48px]">
-            <div className="flex-1">
-              <div className={banner ? 'block' : 'hidden'}>
-                <div className={`rounded-2xl px-5 py-3 text-sm font-medium ${
-                  banner?.type === 'error' ? 'bg-[#F7D9D9] text-red-700' : 'bg-emerald-100 text-emerald-700'
-                }`}>
-                  {banner?.message}
-                </div>
+
+          {/* Tabs + primary actions row */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-3">
+                {navLinks.map((link) => {
+                  const isDatasetTab = link.key === 'enrollees' || link.key === 'applicants' || link.key === 'students'
+                  const archiveActive = isArchiveView && link.key === 'archive'
+                  const datasetActive = (isArchiveView && isDatasetTab && archiveType === link.key) || (!isArchiveView && view === link.key)
+                  return (
+                    <button
+                      key={link.key}
+                      type="button"
+                      onClick={() => {
+                        if (link.key === 'archive') {
+                          if (isArchiveView) {
+                            const dest = archiveType || 'applicants'
+                            navigate(`${basePath}/${dest}`)
+                          } else {
+                            const current = isStudentView ? 'students' : (isEnrolleeView ? 'enrollees' : 'applicants')
+                            navigate(`${basePath}/archive?type=${encodeURIComponent(current)}`)
+                          }
+                          return
+                        }
+                        if (isArchiveView && isDatasetTab) {
+                          navigate(`${basePath}/archive?type=${encodeURIComponent(link.key)}`)
+                        } else {
+                          navigate(link.href)
+                        }
+                      }}
+                      className={`rounded-full px-6 py-2 text-sm font-medium transition ${
+                        archiveActive
+                          ? 'bg-[#a62a49] text-white shadow-lg shadow-rose-200/60'
+                          : datasetActive
+                            ? 'bg-[#c4375b] text-white shadow-lg shadow-rose-200/60'
+                            : 'bg-white text-[#c4375b]'
+                      }`}
+                    >
+                      {link.label}
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-            <div className="flex gap-4">
+
+              <div className="flex flex-wrap gap-3 justify-end">
             {user?.role === 'OFFICER' && (
               <button
                 type="button"
@@ -1421,6 +1415,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               Add New
             </button>
             </div>
+            </div>
+
+            {/* Banner aligned below full width */}
+            {banner && (
+              <div className="rounded-2xl px-5 py-3 text-sm font-medium mt-1
+                bg-[#F7D9D9] text-red-700">
+                {banner.message}
+              </div>
+            )}
           </div>
         </div>
 
