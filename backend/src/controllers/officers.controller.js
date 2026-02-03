@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { getOfficerUserModel } from '../models/User.js';
 
 export async function list(req, res, next) {
@@ -20,17 +21,46 @@ export async function list(req, res, next) {
   } catch (e) { next(e); }
 }
 
+export async function updatePermissionsAll(req, res, next) {
+  try {
+    console.log('[updatePermissionsAll] Route matched correctly');
+    const User = getOfficerUserModel();
+    const { permissions } = req.body || {};
+    if (!permissions || typeof permissions !== 'object') {
+      return res.status(400).json({ error: 'permissions object required' });
+    }
+    const result = await User.updateMany(
+      { role: 'OFFICER', archived: { $ne: true } },
+      { $set: { permissions } }
+    );
+    const modified = result.modifiedCount ?? result.nModified ?? 0;
+    const rows = await User.find({ role: 'OFFICER', archived: { $ne: true } }).lean();
+    res.json({ ok: true, updated: modified, rows });
+  } catch (e) { next(e); }
+}
+
 export async function update(req, res, next) {
   try {
     const User = getOfficerUserModel();
+    const id = req.params.id;
+    // Explicitly reject reserved route names to prevent route matching issues
+    const reservedRoutes = ['permissions', 'interviewers', 'archived'];
+    if (reservedRoutes.includes(id)) {
+      console.log(`[update] Rejected reserved route name: ${id}`);
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log(`[update] Invalid ObjectId: ${id}`);
+      return res.status(400).json({ error: 'Invalid officer ID' });
+    }
     const { __v, ...data } = req.body || {};
-    const filter = { _id: req.params.id };
+    const filter = { _id: id };
     if (__v !== undefined) filter.__v = __v;
     const result = await User.updateOne(filter, { $set: data, $inc: { __v: 1 } });
     if ((result.modifiedCount ?? result.nModified ?? 0) === 0) {
       return res.status(409).json({ error: 'Conflict: record has been modified by another user' });
     }
-    const doc = await User.findById(req.params.id).lean();
+    const doc = await User.findById(id).lean();
     res.json({ doc });
   } catch (e) { next(e); }
 }

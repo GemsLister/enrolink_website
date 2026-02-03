@@ -16,13 +16,11 @@ export default function Settings() {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [officers, setOfficers] = useState([])
-  const [selectedOfficerId, setSelectedOfficerId] = useState('')
   const [perms, setPerms] = useState({
     createRecords: false,
     editRecords: false,
     processEnrollment: false,
     archiveRecords: false,
-    manageSchedule: false,
     generateReports: false,
     viewRecordsAllPrograms: false,
   })
@@ -55,36 +53,41 @@ export default function Settings() {
         // Only department heads should ever load the officers list
         if (!token || !user || user.role !== 'DEPT_HEAD') return
         const res = await api.get('/officers')
-        if (active) setOfficers(res.rows || [])
+        const rows = res.rows || []
+        if (active) {
+          setOfficers(rows)
+          // Load permissions from the first officer (all officers should have the same permissions)
+          if (rows.length > 0) {
+            const firstOfficer = rows[0]
+            const p = firstOfficer.permissions || {}
+            const legacyEditProfiles = !!p.editProfiles
+            setPerms({
+              createRecords: p.createRecords != null ? !!p.createRecords : legacyEditProfiles,
+              editRecords: p.editRecords != null ? !!p.editRecords : legacyEditProfiles,
+              processEnrollment: !!p.processEnrollment,
+              archiveRecords: !!p.archiveRecords,
+              generateReports: !!p.generateReports,
+              viewRecordsAllPrograms: !!p.viewRecordsAllPrograms,
+            })
+          }
+        }
       } catch (_) { if (active) setOfficers([]) }
     }
     loadOfficers()
     return () => { active = false }
   }, [api, token, user])
 
-  function selectOfficer(id) {
-    setSelectedOfficerId(id)
-    const o = officers.find(x => String(x._id || x.id) === String(id))
-    const p = (o && o.permissions) || {}
-    const legacyEditProfiles = !!p.editProfiles
-    setPerms({
-      createRecords: p.createRecords != null ? !!p.createRecords : legacyEditProfiles,
-      editRecords: p.editRecords != null ? !!p.editRecords : legacyEditProfiles,
-      processEnrollment: !!p.processEnrollment,
-      archiveRecords: !!p.archiveRecords,
-      manageSchedule: !!p.manageSchedule,
-      generateReports: !!p.generateReports,
-      viewRecordsAllPrograms: !!p.viewRecordsAllPrograms,
-    })
-  }
-
   async function saveOfficerPerms() {
-    if (!selectedOfficerId) return
     try {
       setErr(''); setMsg('')
-      const res = await api.patch(`/officers/${encodeURIComponent(selectedOfficerId)}`, { permissions: perms })
-      setMsg('Permissions updated')
-      setOfficers(prev => prev.map(o => String(o._id || o.id) === String(selectedOfficerId) ? { ...o, permissions: res.doc?.permissions || perms } : o))
+      const res = await api.patch('/officers/bulk/permissions', { permissions: perms })
+      const rows = res.rows || []
+      if (rows.length) {
+        setOfficers(rows)
+      } else {
+        setOfficers(prev => prev.map(o => ({ ...o, permissions: { ...(o.permissions || {}), ...perms } })))
+      }
+      setMsg('Permissions updated for all officers')
     } catch (e) { setErr(e.message) }
   }
 
@@ -199,41 +202,30 @@ export default function Settings() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <section className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-6 border border-[#f7d6d6] space-y-4">
               <h2 className="text-sm font-bold text-[#7d102a]">Assign Roles and Permissions</h2>
-              <div className="space-y-1">
-                <label className="text-sm text-[#5b1a30]">Select Officer</label>
-                <select value={selectedOfficerId} onChange={(e)=>selectOfficer(e.target.value)} className="bg-white border border-rose-200 rounded-full px-5 py-3 text-sm text-[#5b1a30] w-full">
-                  <option value="">Choose an officer…</option>
-                  {officers.map(o => (
-                    <option key={String(o._id || o.id)} value={String(o._id || o.id)}>{o.name || o.email}</option>
-                  ))}
-                </select>
+              <p className="text-xs text-[#8b4a5d]">Changes below will be applied to <span className="font-semibold">all officers</span> when you save.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { key: 'createRecords', label: 'Add applicants & students' },
+                  { key: 'editRecords', label: 'Edit record details' },
+                  { key: 'processEnrollment', label: 'Move between Applicant / Enrollee / Student' },
+                  { key: 'archiveRecords', label: 'Archive / restore records' },
+                  { key: 'generateReports', label: 'Export records to PDF' },
+                  { key: 'viewRecordsAllPrograms', label: 'Import using XLSX' },
+                ].map(item => (
+                  <label key={item.key} className="flex items-center justify-between rounded-2xl px-4 py-3 border border-rose-200">
+                    <span className="text-sm font-medium text-[#5b1a30]">{item.label}</span>
+                    <button
+                      type="button"
+                      onClick={()=>setPerms(p=>({ ...p, [item.key]: !p[item.key] }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${perms[item.key]?'bg-[#c4375b]':'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${perms[item.key]?'translate-x-5':'translate-x-1'}`} />
+                    </button>
+                  </label>
+                ))}
               </div>
-              {selectedOfficerId && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    { key: 'createRecords', label: 'Add applicants & students' },
-                    { key: 'editRecords', label: 'Edit record details' },
-                    { key: 'processEnrollment', label: 'Move between Applicant / Enrollee / Student' },
-                    { key: 'archiveRecords', label: 'Archive / restore records' },
-                    { key: 'manageSchedule', label: 'Manage schedule and subjects' },
-                    { key: 'generateReports', label: 'Export records to PDF' },
-                    { key: 'viewRecordsAllPrograms', label: 'Import using XLSX' },
-                  ].map(item => (
-                    <label key={item.key} className="flex items-center justify-between rounded-2xl px-4 py-3 border border-rose-200">
-                      <span className="text-sm font-medium text-[#5b1a30]">{item.label}</span>
-                      <button
-                        type="button"
-                        onClick={()=>setPerms(p=>({ ...p, [item.key]: !p[item.key] }))}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${perms[item.key]?'bg-[#c4375b]':'bg-gray-300'}`}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${perms[item.key]?'translate-x-5':'translate-x-1'}`} />
-                      </button>
-                    </label>
-                  ))}
-                </div>
-              )}
               <div className="flex justify-end">
-                <button onClick={saveOfficerPerms} disabled={!selectedOfficerId} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">Save Permissions</button>
+                <button onClick={saveOfficerPerms} disabled={!officers.length} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60">Save Permissions for All Officers</button>
               </div>
             </section>
           </div>

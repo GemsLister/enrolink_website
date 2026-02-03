@@ -41,7 +41,6 @@ UserSchema.add({
       processEnrollment: false,
       archiveRecords: false,
       // Other capabilities
-      manageSchedule: false,
       generateReports: false,
       viewRecordsAllPrograms: false
     }
