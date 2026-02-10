@@ -9,11 +9,6 @@ import ScheduleCreateModal from '../../components/ScheduleCreateModal'
 import ApplicantsIcon from '../../assets/applicants.png'
 import InterviewedIcon from '../../assets/interviewed.png'
 import EnrolledIcon from '../../assets/enrolled.png'
-import ScheduleIcon from '../../assets/Union.png'
-import RecentAddedIcon from '../../assets/recent-activity-added-student.png'
-import RecentEditedIcon from '../../assets/recent-activty-edited.png'
-import RecentArchiveIcon from '../../assets/recent-activity-icon-archive.png'
-
 
 function StatIcon({ cardKey }) {
   const iconMap = {
@@ -30,6 +25,7 @@ function StatIcon({ cardKey }) {
     </div>
   )
 }
+
 
 function getStartYearOptions() {
   const current = new Date().getFullYear()
@@ -1014,11 +1010,7 @@ export default function OfficerDashboard() {
                           const accepted = String(ev.action || '').toLowerCase().includes('accepted')
                           return (
                             <li key={idx} className="px-4 py-2 flex items-start gap-3 hover:bg-[#fff5f7]">
-                              {(() => {
-                                const a = String(ev.action || '').toLowerCase()
-                                const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon))
-                                return <img src={src} alt="" className="w-7 h-7 rounded-full" />
-                              })()}
+
                               <div className="flex-1">
                                 <div className="font-semibold">{label}</div>
                                 <div className="text-xs text-[#8b4a5d]">{accepted ? `Accepted invite ${timeAgo(when)}` : `${ev.action || 'Activity'} ${timeAgo(when)}`}</div>
@@ -1088,7 +1080,7 @@ export default function OfficerDashboard() {
                         }}
                         aria-label={`Select ${ev.summary || 'schedule'}`}
                       />
-                      <img src={ScheduleIcon} alt="" className="w-12 h-12 rounded-full" />
+
                       <div className="text-sm leading-relaxed text-[#7d102a]">
                         <p className="font-semibold">{ev.summary || 'Untitled Event'}</p>
                         <p className="text-xs text-[#a86a74]">{dt ? dt.toLocaleString() : ''}</p>
