@@ -297,16 +297,19 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
   };
 
   const eventStyleGetter = (event) => {
-    const backgroundColor = "#1a73e8"; // Google Calendar blue
     const style = {
-      backgroundColor,
+      backgroundColor: "#1a73e8",
       borderRadius: "4px",
       opacity: 0.9,
       color: "white",
       border: "none",
       display: "block",
       padding: "2px 5px",
-      fontSize: "0.85rem",
+      fontSize: "0.75rem",
+      lineHeight: "1.2",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
     };
     return { style };
   };
@@ -451,18 +454,36 @@ export default function CalendarGrid({ calendarId: propCalendarId }) {
         selectable
         components={{
           toolbar: CustomToolbar,
-          event: (props) => {
+          event: ({ event }) => {
+            const raw = event?.resource?.raw || {};
+            const timeStr = !event.allDay && event.start
+              ? event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : 'Anytime of the day';
+            const desc = raw.description || '';
+            const location = raw.location || '';
+            const tooltipLines = [
+              event.title,
+              timeStr,
+              location && `Location: ${location}`,
+              desc && `Details: ${desc}`,
+            ].filter(Boolean).join('\n');
+
             return (
               <div
-                style={props.style}
-                title={props.event.title}
-                onClick={() => handleSelectEvent(props.event)}
+                style={{ cursor: 'pointer', lineHeight: '1.3', padding: '1px 0' }}
+                title={tooltipLines}
+                onClick={() => handleSelectEvent(event)}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  openArchiveConfirm([props.event.id]);
+                  openArchiveConfirm([event.id]);
                 }}
               >
-                {props.event.title}
+                <div style={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {event.title}
+                </div>
+                <div style={{ fontSize: '0.65rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {timeStr}{desc ? ` · ${desc}` : ''}
+                </div>
               </div>
             );
           }

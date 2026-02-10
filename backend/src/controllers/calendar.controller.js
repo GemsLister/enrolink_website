@@ -246,14 +246,14 @@ export async function list(req, res, next) {
           if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
           return null;
         };
-        const mapRows = (rows) => rows.map(r => {
+        const mapRows = (rows, collection) => rows.map(r => {
           const dt = parse(r.interviewDate);
           if (!dt || !within(dt)) return null;
           const dateStr = dt.toISOString().split('T')[0];
           const title = `${r.firstName || ''} ${r.lastName || ''}`.trim() || 'Interview';
-          return { id: `rec_${dateStr}_${title.replace(/\s+/g,'_')}_${Math.random().toString(36).slice(2)}`, summary: title, description: '', start: { date: dateStr }, end: { date: dateStr }, htmlLink: null, source: 'records' };
+          return { id: `rec_${collection}_${r._id}`, summary: title, description: '', start: { date: dateStr }, end: { date: dateStr }, htmlLink: null, source: 'records' };
         }).filter(Boolean);
-        interviewEvents = [...mapRows(rowsA), ...mapRows(rowsS)];
+        interviewEvents = [...mapRows(rowsA, 'applicants'), ...mapRows(rowsS, 'students')];
       } catch (e) {
         console.error('Error building interview events:', e);
       }
@@ -361,6 +361,25 @@ export async function remove(req, res, next) {
     const cid = await getCalendarId(req);
     const id = req.params.id;
     if (!id) return res.status(400).json({ error: 'id required' });
+
+    // Handle synthetic interview events from student records (rec_<collection>_<mongoId>)
+    if (id.startsWith('rec_')) {
+      const parts = id.split('_');
+      // Format: rec_<collection>_<mongoId>
+      const collection = parts[1]; // 'applicants' or 'students'
+      const recordId = parts.slice(2).join('_');
+      if (!collection || !recordId) return res.status(400).json({ error: 'Invalid record event id' });
+      try {
+        const Model = getRecordModel(collection, false);
+        const result = await Model.updateOne({ _id: recordId }, { $set: { interviewDate: '' } });
+        if (result.modifiedCount === 0) return res.status(404).json({ error: 'Record not found' });
+        return res.json({ ok: true, archived: true, sources: { recordCleared: true } });
+      } catch (e) {
+        console.error('Error clearing interviewDate on record:', e);
+        return res.status(500).json({ error: 'Failed to clear interview date' });
+      }
+    }
+
     if (String(process.env.USE_SIMPLE_CALENDAR || '').toLowerCase() === 'true') {
       const r = await Schedule.findOneAndDelete({ _id: id, calendarId: cid });
       if (!r) return res.status(404).json({ error: 'not found' });
