@@ -1088,7 +1088,6 @@ export default function OfficerDashboard() {
                         }}
                         aria-label={`Select ${ev.summary || 'schedule'}`}
                       />
-                      <img src={ScheduleIcon} alt="" className="w-12 h-12 rounded-full" />
                       <div className="text-sm leading-relaxed text-[#7d102a]">
                         <p className="font-semibold">{ev.summary || 'Untitled Event'}</p>
                         <p className="text-xs text-[#a86a74]">{dt ? dt.toLocaleString() : ''}</p>

@@ -14,7 +14,7 @@ export function useBatchManagement(token, opts = {}) {
   const [membersLoading, setMembersLoading] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
-  const [addValues, setAddValues] = useState({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending', examScore: '' })
+  const [addValues, setAddValues] = useState({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Applicant', examScore: '' })
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false)
   const [addBatchValues, setAddBatchValues] = useState({ name: '', interviewer: '', status: 'ONGOING' })
   const [addBatchLoading, setAddBatchLoading] = useState(false)
@@ -116,6 +116,7 @@ export function useBatchManagement(token, opts = {}) {
         await api.patch(`/batches/${id}/archive`, {})
       }
       setBatches(prev => prev.filter(s => !selectedIds.has(s.id)))
+      try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { removed: ids } })) } catch (_) {}
       clearSelection()
     } catch (_) {}
   }
@@ -150,7 +151,10 @@ export function useBatchManagement(token, opts = {}) {
           studentsCount: b.studentsCount || 0,
           createdAt: b.createdAt || '',
         }))
-        if (mounted) setBatches(rows)
+        if (mounted) {
+          setBatches(rows)
+          try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { refreshed: true } })) } catch (_) {}
+        }
       } catch (_) {} finally { if (mounted) setBatchesLoading(false) }
     }
     load()
@@ -170,7 +174,7 @@ export function useBatchManagement(token, opts = {}) {
     setShowMembers(false)
     setMembers([])
     setShowAdd(false)
-    setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending', examScore: '' })
+    setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Applicant', examScore: '' })
   }
 
   const updateBatchStatus = async (batch, label) => {
@@ -180,6 +184,7 @@ export function useBatchManagement(token, opts = {}) {
       const id = batch.id
       await api.put(`/batches/${id}`, { status: apiStatus })
       setBatches(prev => prev.map(b => (b.id === id ? { ...b, status: label } : b)))
+      try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { updatedId: id, status: label } })) } catch (_) {}
     } catch (_) {}
   }
   const saveBatchEdits = async (batchId, interviewer, statusLabel, code) => {
@@ -193,6 +198,7 @@ export function useBatchManagement(token, opts = {}) {
       const doc = res?.doc || {}
       setBatches(prev => prev.map(b => (b.id === batchId ? { ...b, code: doc.code || code || b.code, interviewer: doc.interviewer || interviewer || b.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : b)))
       setSelectedBatch(prev => prev ? { ...prev, code: doc.code || code || prev.code, interviewer: doc.interviewer || interviewer || prev.interviewer, status: ((s)=>{ const v=(s||'').toString().toUpperCase(); return v==='PENDING'?'ONGOING':'COMPLETED'})(doc.status || payload.status) } : prev)
+      try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { updatedId: batchId } })) } catch (_) {}
     } catch (_) {}
   }
   const closeModal = () => {
@@ -203,7 +209,7 @@ export function useBatchManagement(token, opts = {}) {
     setShowMembers(false)
     setMembers([])
     setShowAdd(false)
-    setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending' })
+    setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Applicant' })
   }
   const loadMembers = async (batchId) => {
     try {
@@ -213,6 +219,7 @@ export function useBatchManagement(token, opts = {}) {
         id: String(s._id || s.id || ''),
         firstName: s.firstName || '',
         lastName: s.lastName || '',
+        recordCategory: s.recordCategory || '',
         status: toUiStatus(s.status || ''),
         email: s.email || '',
         contact: s.contact || '',
@@ -241,6 +248,7 @@ export function useBatchManagement(token, opts = {}) {
       if (b) {
         const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
         setBatches(prev => [mapped, ...prev])
+        try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { added: mapped } })) } catch (_) {}
         setIsAddBatchOpen(false)
       }
     } catch (_) {
@@ -260,6 +268,7 @@ export function useBatchManagement(token, opts = {}) {
       if (b) {
         const mapped = { id: String(b._id || b.id), code: b.code, year: b.year, index: b.index, interviewer: b.interviewer || '', status: ((s) => { const v = (s || '').toString().toUpperCase(); return v === 'PENDING' ? 'ONGOING' : 'COMPLETED' })(b.status), studentsCount: 0, createdAt: b.createdAt || '' }
         setBatches(prev => [mapped, ...prev])
+        try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { added: mapped } })) } catch (_) {}
         setIsAddBatchOpen(false)
         // Open Import modal to append to this newly created batch
         setImportMode('sheets')
@@ -549,9 +558,9 @@ export function useBatchManagement(token, opts = {}) {
     try {
       const res = await api.post('/students', payload)
       const saved = res?.doc || {}
-      const mapped = { id: String(saved._id || ''), firstName: saved.firstName || payload.firstName, lastName: saved.lastName || payload.lastName, status: toUiStatus(saved.status || payload.status), email: saved.email || payload.email, contact: saved.contact || payload.contact, interviewDate: saved.interviewDate || payload.interviewDate || '' }
+      const mapped = { id: String(saved._id || ''), firstName: saved.firstName || payload.firstName, lastName: saved.lastName || payload.lastName, recordCategory: saved.recordCategory || payload.recordCategory || '', status: toUiStatus(saved.status || payload.status), email: saved.email || payload.email, contact: saved.contact || payload.contact, interviewDate: saved.interviewDate || payload.interviewDate || '' }
       setShowAdd(false)
-      setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Pending', examScore: '' })
+      setAddValues({ firstName: '', lastName: '', email: '', contact: '', interviewDate: '', status: 'Applicant', examScore: '' })
       if (showMembers) setMembers(prev => [mapped, ...prev])
       setSelectedBatch(prev => prev ? { ...prev, studentsCount: (prev.studentsCount || 0) + 1 } : prev)
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? { ...b, studentsCount: (b.studentsCount || 0) + 1 } : b))

@@ -8,7 +8,8 @@ const UserSchema = new mongoose.Schema(
     name: { type: String },
     role: { type: String, enum: ['DEPT_HEAD', 'OFFICER'], required: true },
     assignedYear: { type: String },
-    assignedBatch: { type: String },
+    assignedBatches: [{ type: String }],
+    assignedBatch: { type: String }, // legacy single batch; keep for backward compatibility
     canInterview: { type: Boolean, default: false },
     provider: { type: String, enum: ['local', 'google'], default: 'local' },
     googleId: { type: String }

@@ -486,6 +486,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [exportPaperSize, setExportPaperSize] = useState('A4')
   const [selectedRows, setSelectedRows] = useState([])
   const [confirmArchiveIds, setConfirmArchiveIds] = useState([])
+  const [officerBatches, setOfficerBatches] = useState([])
+  const [selectedBatchId, setSelectedBatchId] = useState('')
+  const [loadingBatches, setLoadingBatches] = useState(false)
   
 
   const isArchiveView = view === 'archive'
@@ -521,6 +524,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       const params = {}
       if (currentCategory) params.recordCategory = currentCategory
       params.archived = isArchiveView ? '1' : '0'
+      // If officer and a batch is selected, filter by that batch id
+      if (user?.role === 'OFFICER' && selectedBatchId) {
+        params.batchId = selectedBatchId
+      }
       const queryString = Object.keys(params)
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
         .join('&')
@@ -536,7 +543,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     } finally {
       setLoading(false)
     }
-  }, [api, currentCategory, isArchiveView, setBanner])
+  }, [api, currentCategory, isArchiveView, setBanner, user, selectedBatchId])
 
   useEffect(() => {
     fetchRows()
@@ -545,6 +552,53 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   useEffect(() => {
     if (!loading) restoreScroll()
   }, [loading, restoreScroll])
+
+  // Fetch officer’s assigned batches
+  const fetchOfficerBatches = useCallback(async () => {
+    if (user?.role !== 'OFFICER') return
+    let active = true
+    const fetch = async () => {
+      setLoadingBatches(true)
+      try {
+        const res = await api.get('/batches')
+        const allBatches = Array.isArray(res?.rows) ? res.rows : []
+        // Include batches assigned by code/id AND batches where officer is the interviewer.
+        // (Important: auth `user.assignedBatches` may be stale until re-login.)
+        const officerBatchCodes = Array.isArray(user.assignedBatches)
+          ? user.assignedBatches
+          : (user.assignedBatch ? [user.assignedBatch] : [])
+        const uname = String(user.name || '').trim().toLowerCase()
+        const uemail = String(user.email || '').trim().toLowerCase()
+
+        const filtered = allBatches.filter((b) => {
+          const bid = b.id || (b._id ? String(b._id) : '')
+          const byAssigned = officerBatchCodes.length
+            ? (officerBatchCodes.includes(b.code) || (bid && officerBatchCodes.includes(bid)))
+            : false
+
+          const ib = String(b.interviewer || '').trim().toLowerCase()
+          const byInterviewer = !!ib && (
+            (uname && (ib === uname || ib.includes(uname) || uname.includes(ib))) ||
+            (uemail && (ib === uemail || ib.includes(uemail) || uemail.includes(ib)))
+          )
+
+          return byAssigned || byInterviewer
+        })
+        if (active) setOfficerBatches(filtered)
+      } catch (e) {
+        console.error('Failed to fetch batches for officer:', e)
+        if (active) setOfficerBatches([])
+      } finally {
+        if (active) setLoadingBatches(false)
+      }
+    }
+    fetch()
+    return () => { active = false }
+  }, [api, user])
+
+  useEffect(() => {
+    fetchOfficerBatches()
+  }, [fetchOfficerBatches])
 
   const getSortOptions = (key) => {
     if (key === 'recordCategory' || key === 'remarks') {
@@ -631,6 +685,39 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       return next
     })
   }
+
+  // Listen for batch updates from other pages (e.g., Batch Management)
+  useEffect(() => {
+    if (user?.role !== 'OFFICER') return
+    const handleBatchesUpdated = (event) => {
+      // Re-fetch officer batches when batches are created/updated/removed elsewhere
+      setLoadingBatches(true)
+      api.get('/batches').then(res => {
+        const allBatches = Array.isArray(res?.rows) ? res.rows : []
+        const officerBatchCodes = Array.isArray(user.assignedBatches) ? user.assignedBatches : (user.assignedBatch ? [user.assignedBatch] : [])
+        let filtered = []
+        if (officerBatchCodes.length) {
+          filtered = allBatches.filter((b) => {
+            const bid = b.id || (b._id ? String(b._id) : undefined)
+            return officerBatchCodes.includes(b.code) || (bid && officerBatchCodes.includes(bid))
+          })
+        } else {
+          const uname = String(user.name || user.email || '').trim().toLowerCase()
+          filtered = allBatches.filter((b) => {
+            const ib = String(b.interviewer || '').trim().toLowerCase()
+            if (!ib) return false
+            return ib === uname || ib.includes(uname) || uname.includes(ib) || ib === String(user.email || '').toLowerCase()
+          })
+        }
+        setOfficerBatches(filtered)
+        setLoadingBatches(false)
+      }).catch(() => {
+        setLoadingBatches(false)
+      })
+    }
+    window.addEventListener('batches:updated', handleBatchesUpdated)
+    return () => window.removeEventListener('batches:updated', handleBatchesUpdated)
+  }, [api, user])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1365,13 +1452,30 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
               <div className="flex flex-wrap gap-3 justify-end">
             {user?.role === 'OFFICER' && (
-              <button
-                type="button"
-                onClick={() => navigate(`${basePath}/students`)}
-                className="rounded-full bg-[#6b0000] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#8b0000]"
-              >
-                Assigned Students
-              </button>
+              <div className="flex items-center gap-2">
+                <label htmlFor="batch-select" className="text-sm font-medium text-[#5b1a30]">Batch:</label>
+                  <select
+                    id="batch-select"
+                    value={selectedBatchId}
+                    onChange={e => setSelectedBatchId(e.target.value)}
+                    disabled={loadingBatches || officerBatches.length === 0}
+                    className="rounded-full border border-rose-200 bg-white px-4 py-2 text-sm text-[#5b1a30] focus:border-rose-400 focus:outline-none disabled:opacity-60"
+                  >
+                    <option value="">All assigned batches</option>
+                    {officerBatches.map(batch => (
+                      <option key={batch.id || batch._id} value={batch.id || batch._id}>{batch.code} ({batch.year})</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchOfficerBatches}
+                    disabled={loadingBatches}
+                    className="rounded-full border border-rose-200 bg-white px-3 py-2 text-sm text-[#5b1a30] hover:bg-rose-50 disabled:opacity-60"
+                    title="Refresh batches"
+                  >
+                    ↻
+                  </button>
+              </div>
             )}
             <button
               type="button"
@@ -1419,8 +1523,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
             {/* Banner aligned below full width */}
             {banner && (
-              <div className="rounded-2xl px-5 py-3 text-sm font-medium mt-1
-                bg-[#F7D9D9] text-red-700">
+              <div
+                className={`rounded-2xl px-5 py-3 text-sm font-medium mt-1 ${
+                  banner.type === 'success'
+                    ? 'bg-green-100 text-green-800'
+                    : banner.type === 'error'
+                      ? 'bg-[#F7D9D9] text-red-700'
+                      : 'bg-gray-100 text-gray-800'
+                }`}
+              >
                 {banner.message}
               </div>
             )}

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as ctrl from '../controllers/officers.controller.js';
-import { auth, requireRole } from '../middleware/auth.js';
+import { auth, requireRole, requireAnyRole } from '../middleware/auth.js';
 
 const r = Router();
 

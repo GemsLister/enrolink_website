@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
-import { getStatusBadge } from '../../utils/status'
+import { getCategoryBadge } from '../../utils/status'
 import { useBatchManagement } from './hooks/useBatchManagement'
 import AddPassedStudentsModal from './components/AddPassedStudentsModal'
 
@@ -116,7 +116,7 @@ export default function BatchPage() {
                 {!membersLoading && filteredMembers.map((m) => (
                   <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fafafa]">
                     <td className="px-4 py-2 text-gray-800">{`${m.lastName}, ${m.firstName}`}</td>
-                    <td className="px-4 py-2"><span className={getStatusBadge(m.status)}>{m.status}</span></td>
+                    <td className="px-4 py-2"><span className={getCategoryBadge(m.recordCategory)}>{m.recordCategory || 'Applicant'}</span></td>
                     <td className="px-4 py-2 text-gray-600">{m.email}</td>
                     <td className="px-4 py-2 text-gray-600">{m.interviewDate || '-'}</td>
                   </tr>

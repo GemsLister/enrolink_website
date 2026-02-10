@@ -91,11 +91,7 @@ export default function UserChip() {
   return (
     <div className="relative">
       <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-[0_8px_18px_rgba(139,23,47,0.12)]">
-        <button type="button" onClick={toggleOpen} className="flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#2f2b33] border border-[#efccd2]">
-          <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
-        </button>
-        <span className="h-5 w-px bg-[#e4b7bf]" />
-        <span className="text-gray-800 font-medium inline-flex items-center gap-1">{displayName} <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+        <button type="button" onClick={toggleOpen} className="text-gray-800 font-medium inline-flex items-center gap-1">{displayName} <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button>
       </div>
       {open && (
         <div ref={overlayRef} className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#efccd2] bg-white shadow-2xl text-sm text-[#5b1a30] z-[1000]">

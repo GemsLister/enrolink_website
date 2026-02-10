@@ -1,19 +1,37 @@
 import { getBatchModel } from '../models/Batch.js';
-import { getStudentModel } from '../models/Student.js';
+import { getRecordModel } from '../models/Record.js';
+import { getOfficerUserModel } from '../models/User.js';
 
 export async function list(req, res, next) {
   try {
     const Batch = getBatchModel();
-    const Student = getStudentModel();
+    const Applicants = getRecordModel('applicants', false);
+    const Enrollees = getRecordModel('enrollees', false);
+    const Students = getRecordModel('students', false);
     const q = { archived: { $ne: true } };
     if (req.query.year) q.year = req.query.year;
     const batches = await Batch.find(q).lean();
     const ids = batches.map(b => b._id);
-    const counts = await Student.aggregate([
-      { $match: { batchId: { $in: ids } } },
-      { $group: { _id: '$batchId', count: { $sum: 1 } } },
+
+    const [aCounts, eCounts, sCounts] = await Promise.all([
+      Applicants.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
+      Enrollees.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
+      Students.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
     ]);
-    const countMap = new Map(counts.map(c => [String(c._id), c.count]));
+    const countMap = new Map();
+    for (const c of [...(aCounts || []), ...(eCounts || []), ...(sCounts || [])]) {
+      const key = String(c._id);
+      countMap.set(key, (countMap.get(key) || 0) + Number(c.count || 0));
+    }
     const rows = batches.map(b => ({
       id: String(b._id),
       code: b.code,
@@ -48,8 +66,44 @@ export async function create(req, res, next) {
       if (existing) return res.status(400).json({ error: 'Batch code already exists' });
     }
     const requesterRole = req.user?.role || '';
-    const safeInterviewer = requesterRole === 'OFFICER' ? '' : (interviewer || '');
+    let safeInterviewer = (interviewer || '');
+    // Officers can create batches, but the interviewer should always resolve to the logged-in officer
+    if (requesterRole === 'OFFICER') {
+      try {
+        const User = getOfficerUserModel();
+        const officer = await User.findById(req.user?.id).lean();
+        safeInterviewer = String(officer?.name || officer?.email || interviewer || '').trim();
+        if (officer?._id) {
+          await User.findByIdAndUpdate(officer._id, { $addToSet: { assignedBatches: code } });
+        }
+      } catch (_) {
+        safeInterviewer = String(interviewer || '').trim();
+      }
+    }
+
     const doc = await Batch.create({ code, year, index: nextIndex, interviewer: safeInterviewer, status });
+
+    // If an interviewer (officer) is specified (head flow), add this batch to their assignedBatches
+    if (requesterRole !== 'OFFICER' && interviewer && typeof interviewer === 'string' && interviewer.trim()) {
+      try {
+        const User = getOfficerUserModel();
+        const normalized = interviewer.trim().toLowerCase();
+        // Try to match by name or email (case-insensitive)
+        const officer = await User.findOne({
+          $or: [
+            { name: { $regex: `^${normalized}$`, $options: 'i' } },
+            { email: { $regex: `^${normalized}$`, $options: 'i' } }
+          ]
+        });
+        if (officer) {
+          await User.findByIdAndUpdate(officer._id, {
+            $addToSet: { assignedBatches: code }
+          });
+        }
+      } catch (e) {
+        console.warn('[batches.controller.create] failed to update officer assignedBatches:', e);
+      }
+    }
     res.json({ doc });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -74,9 +128,19 @@ export async function remove(req, res, next) {
 
 export async function students(req, res, next) {
   try {
-    const Student = getStudentModel();
     const { id } = req.params;
-    const rows = await Student.find({ batchId: id }).lean();
+    const Applicants = getRecordModel('applicants', false);
+    const Enrollees = getRecordModel('enrollees', false);
+    const Students = getRecordModel('students', false);
+
+    const [aRows, eRows, sRows] = await Promise.all([
+      Applicants.find({ batchId: id }).lean(),
+      Enrollees.find({ batchId: id }).lean(),
+      Students.find({ batchId: id }).lean(),
+    ]);
+
+    // Return a single list (callers can display them together)
+    const rows = [...(aRows || []), ...(eRows || []), ...(sRows || [])];
     res.json({ rows });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -108,14 +172,31 @@ export async function update(req, res, next) {
 export async function archived(req, res, next) {
   try {
     const Batch = getBatchModel();
-    const Student = getStudentModel();
+    const Applicants = getRecordModel('applicants', false);
+    const Enrollees = getRecordModel('enrollees', false);
+    const Students = getRecordModel('students', false);
     const batches = await Batch.find({ archived: true }).lean();
     const ids = batches.map(b => b._id);
-    const counts = await Student.aggregate([
-      { $match: { batchId: { $in: ids } } },
-      { $group: { _id: '$batchId', count: { $sum: 1 } } },
+
+    const [aCounts, eCounts, sCounts] = await Promise.all([
+      Applicants.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
+      Enrollees.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
+      Students.aggregate([
+        { $match: { batchId: { $in: ids } } },
+        { $group: { _id: '$batchId', count: { $sum: 1 } } },
+      ]),
     ]);
-    const countMap = new Map(counts.map(c => [String(c._id), c.count]));
+    const countMap = new Map();
+    for (const c of [...(aCounts || []), ...(eCounts || []), ...(sCounts || [])]) {
+      const key = String(c._id);
+      countMap.set(key, (countMap.get(key) || 0) + Number(c.count || 0));
+    }
     const rows = batches.map(b => ({
       id: String(b._id),
       code: b.code,
@@ -128,7 +209,11 @@ export async function archived(req, res, next) {
       archivedAt: b.archivedAt || null,
     }));
     res.json({ rows });
-  } catch (e) { next(e); }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[batches.controller.archived] error:', e && e.stack ? e.stack : e);
+    next(e);
+  }
 }
 
 export async function restore(req, res, next) {
@@ -175,7 +260,7 @@ export async function setSchedule(req, res, next) {
 export async function applyInterviewDate(req, res, next) {
   try {
     const Batch = getBatchModel();
-    const Student = getStudentModel();
+    const Student = getRecordModel('students', false);
     const { id } = req.params;
     const { overwrite = false, onlyEmpty = true } = req.body || {};
     const batch = await Batch.findById(id).lean();

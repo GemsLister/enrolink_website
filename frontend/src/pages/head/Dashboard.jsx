@@ -1184,7 +1184,6 @@ export default function Dashboard() {
                           });
                         }}
                       />
-                      <img src={ScheduleIcon} alt="" className="w-12 h-12 rounded-full" />
                     </div>
                     <div className="flex-1 text-sm leading-relaxed text-[#7d102a]">
                       <p className="font-semibold">
@@ -1232,11 +1231,6 @@ export default function Dashboard() {
                     key={activity.id}
                     className="flex gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(139,23,47,0.08)] border border-[#efccd2]"
                   >
-                    {(() => {
-                      const a = String(activity.action || '').toLowerCase();
-                      const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon));
-                      return <img src={src} alt="" className="w-12 h-12 rounded-full" />;
-                    })()}
                     <div className="text-sm leading-relaxed text-[#7d102a]">
                       <p>
                         <span className="font-semibold">{activity.actor}</span>

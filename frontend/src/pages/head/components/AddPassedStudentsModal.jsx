@@ -25,6 +25,7 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
           lastName: s.lastName || '',
           email: s.email || '',
           contact: s.contact || '',
+          recordCategory: s.recordCategory || '',
           status: String(s.status || '').toUpperCase(),
           interviewerDecision: String(s.interviewerDecision || '').toUpperCase(),
           batchId: s.batchId ? String(s.batchId) : '',
@@ -43,16 +44,19 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
           alreadyNames = new Set(members.map((m)=>norm(m.lastName, m.firstName)))
         } catch (_) { already = new Set() }
         const norm = (a,b) => `${String(a||'').trim().toLowerCase()}|${String(b||'').trim().toLowerCase()}`
-        const passedOnly = all.filter((r) => {
-          if (r.interviewerDecision !== 'PASSED') return false
-          if (r.batchId === (selectedBatch?.id || '')) return false
+        // Show applicants that are not yet assigned to any batch (no batchId),
+        // and avoid duplicates with students already in the selected batch.
+        const unassigned = all.filter((r) => {
+          // Only consider records that are not linked to any batch yet
+          if (r.batchId) return false
+          // Skip if already part of this batch via ID/email/name match
           if (already.has(r.id)) return false
           const em = String(r.email || '').trim().toLowerCase()
           if (em && alreadyEmails.has(em)) return false
           if (alreadyNames.has(norm(r.lastName, r.firstName))) return false
           return true
         })
-        if (active) { setRows(passedOnly); setExistingIds(already) }
+        if (active) { setRows(unassigned); setExistingIds(already) }
       } catch (_) {
         if (active) setRows([])
       } finally {
@@ -99,10 +103,8 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
         const s = rows.find((r) => r.id === id)
         if (!s) continue
         const payload = {
-          firstName: s.firstName,
-          middleName: s.middleName,
-          lastName: s.lastName,
-          status: 'PASSED',
+          id: s.id,
+          recordCategory: s.recordCategory,
           batchId: selectedBatch.id,
           batch: selectedBatch.year,
           interviewer: selectedBatch.interviewer || '',

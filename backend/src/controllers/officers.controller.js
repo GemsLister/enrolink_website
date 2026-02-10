@@ -68,7 +68,7 @@ export async function update(req, res, next) {
 export async function interviewers(req, res, next) {
   try {
     const User = getOfficerUserModel();
-    let rows = await User.find({ role: 'OFFICER', canInterview: true }).select('_id name email').lean();
+    let rows = await User.find({ role: 'OFFICER', archived: { $ne: true } }).select('_id name email').lean();
     rows = rows.map(r => {
       const em = String(r.email || '');
       const local = em.includes('@') ? em.split('@')[0] : em;
