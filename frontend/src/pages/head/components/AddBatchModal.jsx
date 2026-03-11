@@ -6,6 +6,7 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
   const { token } = useAuth()
   const api = useApi(token)
   const [officers, setOfficers] = useState([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -15,9 +16,27 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
         if (active) setOfficers(res.rows || [])
       } catch (_) { if (active) setOfficers([]) }
     }
-    if (isOpen) load()
+    if (isOpen) {
+      setError('')
+      load()
+    }
     return () => { active = false }
   }, [isOpen, api])
+
+  const handleSubmit = async () => {
+    // Validate officer selection
+    if (allowInterviewer && !addBatchValues.interviewer) {
+      setError('Please select officer first')
+      return
+    }
+    setError('')
+    try {
+      await submitAddBatch()
+    } catch (err) {
+      setError(err.message || 'Failed to create batch')
+    }
+  }
+
   if (!isOpen) return null
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
@@ -35,6 +54,7 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
           </svg>
         </button>
         <div className="space-y-4">
+          {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">{error}</div>}
           <div className="mb-6">
             <label className="block text-[#6b2b2b] font-semibold text-sm mb-2 text-left">Name</label>
             <input 
@@ -46,13 +66,18 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
           </div>
           {allowInterviewer && (
             <div className="mb-6 relative">
-              <label className="block text-[#6b2b2b] font-semibold text-sm mb-2 text-left">Interviewer</label>
+              <label className="block text-[#6b2b2b] font-semibold text-sm mb-2 text-left">
+                Officer <span className="text-red-600">*</span>
+              </label>
               <select 
                 className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-[#6b2b2b] appearance-none" 
                 value={addBatchValues.interviewer || ''} 
-                onChange={(e) => setAddBatchValues(v => ({ ...v, interviewer: e.target.value }))}
+                onChange={(e) => {
+                  setAddBatchValues(v => ({ ...v, interviewer: e.target.value }))
+                  setError('')
+                }}
               >
-                <option value="">Select Interviewer</option>
+                <option value="">Select Officer</option>
                 {officers.map(officer => (
                   <option key={officer._id} value={officer.name || officer.email}>
                     {officer.name || officer.email}
@@ -87,9 +112,9 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
         </div>
         <div className="flex justify-center">
           <button 
-            onClick={submitAddBatch} 
+            onClick={handleSubmit} 
             disabled={addBatchLoading} 
-            className="bg-[#6b2b2b] hover:bg-[#8b3b3b] text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors duration-200 w-full"
+            className="bg-[#6b2b2b] hover:bg-[#8b3b3b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors duration-200 w-full"
           >
             {addBatchLoading ? 'Adding…' : 'ADD'}
           </button>

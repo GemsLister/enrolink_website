@@ -1058,13 +1058,12 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       setBanner({ type: 'success', message: 'Record saved successfully.' })
       await fetchRows()
       restoreScroll()
-    } catch (error) {
-      setBanner({ type: 'error', message: error.message || 'Failed to save record.' })
-    } finally {
-      setSaving(false)
       setEditingId(null)
       setEditingMeta(null)
       setEditingValues(EMPTY_RECORD)
+    } catch (error) {
+      setBanner({ type: 'error', message: error.message || 'Failed to save record.' })
+      setSaving(false)
     }
   }, [api, editingId, editingMeta, editingValues, fetchRows, saving, setBanner, restoreScroll, token])
 

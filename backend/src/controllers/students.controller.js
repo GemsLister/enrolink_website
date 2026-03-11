@@ -132,6 +132,47 @@ export async function upsert(req, res, next) {
     const kind = cat === 'enrollee' || cat === 'enrollees' ? 'enrollees' : (cat === 'student' || cat === 'students' ? 'students' : 'applicants');
     const { id, __v, ...data } = req.body;
 
+    // Validate required fields
+    const firstName = String(data.firstName || '').trim();
+    const lastName = String(data.lastName || '').trim();
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: 'First name and last name are required' });
+    }
+
+    // Validate email format if provided
+    if (data.email) {
+      const email = String(data.email || '').trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (email && !emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+    }
+
+    // Validate contact number format if provided
+    if (data.contact) {
+      const contact = String(data.contact || '').trim();
+      const contactRegex = /^[0-9+\-\s()]{7,}$/;
+      if (contact && !contactRegex.test(contact)) {
+        return res.status(400).json({ error: 'Invalid contact number format' });
+      }
+    }
+
+    // Validate enrollee-specific fields
+    if (kind === 'enrollees') {
+      if (data.enrollmentStatus && !['ENROLLED', 'PENDING'].includes(String(data.enrollmentStatus).toUpperCase())) {
+        return res.status(400).json({ error: 'Invalid enrollment status. Must be ENROLLED or PENDING' });
+      }
+    }
+
+    // Validate course system - only BSIT and BSEMC-DAT are allowed
+    const VALID_COURSES = ['BSIT', 'BSEMC-DAT'];
+    if (data.course && !VALID_COURSES.includes(String(data.course).trim())) {
+      return res.status(400).json({ error: `Invalid course. Must be one of: ${VALID_COURSES.join(', ')}` });
+    }
+    if (data.preferredCourse && !VALID_COURSES.includes(String(data.preferredCourse).trim())) {
+      return res.status(400).json({ error: `Invalid preferred course. Must be one of: ${VALID_COURSES.join(', ')}` });
+    }
+
     const nameSignature = buildNameSignature(data);
     if (nameSignature) data.nameSignature = nameSignature;
 

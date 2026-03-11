@@ -251,7 +251,8 @@ export function useBatchManagement(token, opts = {}) {
         try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { added: mapped } })) } catch (_) {}
         setIsAddBatchOpen(false)
       }
-    } catch (_) {
+    } catch (err) {
+      throw err
     } finally { setAddBatchLoading(false) }
   }
 
@@ -279,7 +280,8 @@ export function useBatchManagement(token, opts = {}) {
         setImportCreate({ interviewer: '', status: 'PENDING' })
         setIsImportOpen(true)
       }
-    } catch (_) {
+    } catch (err) {
+      throw err
     } finally { setAddBatchLoading(false) }
   }
 

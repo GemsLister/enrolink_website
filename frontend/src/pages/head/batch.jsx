@@ -4,13 +4,18 @@ import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { getCategoryBadge } from '../../utils/status'
 import { useBatchManagement } from './hooks/useBatchManagement'
+import { useApi } from '../../hooks/useApi'
 import AddPassedStudentsModal from './components/AddPassedStudentsModal'
 
 export default function BatchPage() {
   const { isAuthenticated, user, token } = useAuth()
   const navigate = useNavigate()
+  const api = useApi(token)
   const { id } = useParams()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportData, setReportData] = useState(null)
+  const [reportLoading, setReportLoading] = useState(false)
   const {
     batches,
     selectedBatch,
@@ -56,6 +61,43 @@ export default function BatchPage() {
       })
     : members
 
+  const generateReport = async () => {
+    if (!selectedBatch) return
+    try {
+      setReportLoading(true)
+      const res = await api.get(`/reports/batch/report?batch=${encodeURIComponent(selectedBatch.code)}`)
+      setReportData(res)
+      setShowReportModal(true)
+    } catch (e) {
+      alert('Failed to generate report: ' + (e.message || 'Unknown error'))
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!selectedBatch) return
+    try {
+      const res = await fetch(`/api/reports/batch/pdf?batch=${encodeURIComponent(selectedBatch.code)}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+      if (!res.ok) throw new Error('Failed to download PDF')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `batch-${selectedBatch.code}-report.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Failed to download PDF: ' + (e.message || 'Unknown error'))
+    }
+  }
+
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user || (user.role !== 'DEPT_HEAD' && user.role !== 'OFFICER')) return <Navigate to="/" replace />
 
@@ -80,6 +122,7 @@ export default function BatchPage() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => navigate('/head/batch-management')} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Back</button>
+            <button onClick={generateReport} disabled={reportLoading} className="rounded-full bg-[#6b2b5f] px-8 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#5a1f4f] disabled:opacity-50 disabled:cursor-not-allowed">{reportLoading ? 'Generating...' : 'Generate Report'}</button>
             <button onClick={() => setShowAddModal(true)} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 hover:bg-[#a62a49]">Add Student</button>
           </div>
         </div>
@@ -125,8 +168,32 @@ export default function BatchPage() {
             </table>
           </div>
         </div>
-        </div>
+
+        {/* Report Modal */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+              <div className="sticky top-0 bg-gradient-to-b from-red-300 to-pink-100 px-8 py-6 flex justify-between items-center border-b border-rose-200">
+                <h2 className="text-2xl font-bold text-[#5b1a30]">Batch Report - {selectedBatch?.code}</h2>
+                <div className="flex items-center gap-3">
+                  <button onClick={handleDownloadPdf} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition font-medium text-sm">Download PDF</button>
+                  <button onClick={() => window.print()} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition font-medium text-sm">Print</button>
+                  <button onClick={() => setShowReportModal(false)} className="text-[#5b1a30] hover:text-[#3d0a1f] font-bold text-2xl">×</button>
+                </div>
+              </div>
+              <div className="px-8 py-8">
+                {reportData && (
+                  <div className="text-center text-[#7c3a4a]">
+                    <p className="mb-6">Report generated successfully for {selectedBatch?.code}</p>
+                    <p className="text-sm">Click "Download PDF" to save the report</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  </div>
   )
 }

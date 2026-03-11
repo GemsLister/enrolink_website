@@ -79,6 +79,11 @@ export async function create(req, res, next) {
       } catch (_) {
         safeInterviewer = String(interviewer || '').trim();
       }
+    } else if (requesterRole === 'DEPT_HEAD') {
+      // Department heads must select an officer when creating a batch
+      if (!interviewer || !String(interviewer).trim()) {
+        return res.status(400).json({ error: 'An officer must be selected to assign to this batch' });
+      }
     }
 
     const doc = await Batch.create({ code, year, index: nextIndex, interviewer: safeInterviewer, status });
