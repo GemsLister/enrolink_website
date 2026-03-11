@@ -50,7 +50,7 @@ export default function AddBatchModal({ isOpen, setIsOpen, addBatchValues, setAd
           className="absolute top-6 right-6 text-gray-700 hover:text-gray-900 transition-colors"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="#6b2b2b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M6 18L18 6M6 6l12 12" stroke="#6b2b2b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
         <div className="space-y-4">

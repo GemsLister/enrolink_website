@@ -6,9 +6,33 @@ import { api } from "../../api/client";
 import CalendarGrid from "../../components/CalendarGrid";
 import QuickChart from "../../components/QuickChart";
 import ScheduleCreateModal from "../../components/ScheduleCreateModal";
+import RecentAddedIcon from "../../assets/recent-activity-added-student.png";
+import RecentEditedIcon from "../../assets/recent-activty-edited.png";
+import RecentArchiveIcon from "../../assets/recent-activity-icon-archive.png";
 import ApplicantsIcon from "../../assets/applicants.png";
 import InterviewedIcon from "../../assets/interviewed.png";
 import EnrolledIcon from "../../assets/enrolled.png";
+import ScheduleIcon from "../../assets/Union.png";
+
+// Temporary circular icon placeholder used across the UI
+function PlaceholderIcon({
+  size = "w-11 h-11",
+  variant = "primary",
+  label = "icon",
+}) {
+  const styles = {
+    primary: "bg-[#f2c6cf] text-[#8a1d35]",
+    secondary: "bg-[#f0d9dd] text-[#b0475c]",
+    ghost: "bg-white text-[#b0475c] border border-[#efccd2]",
+  };
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full font-semibold uppercase tracking-[0.2em] text-[10px] ${size} ${styles[variant]}`}
+    >
+      {label}
+    </div>
+  );
+}
 
 function getStartYearOptions() {
   const current = new Date().getFullYear();
@@ -1058,7 +1082,7 @@ export default function Dashboard() {
                   )}
                 </button>
                 <span className="text-base font-semibold inline-flex items-center gap-2">
-                  James Lopez
+                  {user?.name}
                 </span>
                 <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current">
                   <path d="M5.5 7.5l4.5 5 4.5-5H5.5z" />
@@ -1077,7 +1101,11 @@ export default function Dashboard() {
                         const accepted = String(ev.action || '').toLowerCase().includes('accepted');
                         return (
                           <div key={idx} className="px-4 py-3 border-t border-[#f2d8dd] text-sm text-[#7d102a] flex items-center gap-3">
-
+                            {(() => {
+                              const a = String(ev.action || '').toLowerCase();
+                              const src = a.includes('added') ? RecentAddedIcon : (a.includes('edited') ? RecentEditedIcon : (a.includes('archive') ? RecentArchiveIcon : ApplicantsIcon));
+                              return <img src={src} alt="" className="w-8 h-8 rounded-full" />;
+                            })()}
                             <div className="flex-1">
                               <div className="font-semibold">{label}</div>
                               <div className="text-xs text-[#a86a74]">

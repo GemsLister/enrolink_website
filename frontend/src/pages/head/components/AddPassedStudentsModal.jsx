@@ -105,6 +105,10 @@ export default function AddPassedStudentsModal({ isOpen, selectedBatch, onClose,
         const payload = {
           id: s.id,
           recordCategory: s.recordCategory,
+          // include names so backend validation passes
+          firstName: s.firstName,
+          middleName: s.middleName,
+          lastName: s.lastName,
           batchId: selectedBatch.id,
           batch: selectedBatch.year,
           interviewer: selectedBatch.interviewer || '',

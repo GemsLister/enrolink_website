@@ -4,13 +4,21 @@ import Sidebar from '../../components/Sidebar'
 import { useAuth } from '../../hooks/useAuth'
 import { api } from '../../api/client'
 import UserChip from '../../components/UserChip'
+import ScrollableTableContainer from '../../components/ScrollableTableContainer'
 
 export default function ArchivePage() {
   const { isAuthenticated, user, token } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [query, setQuery] = useState('')
+
+  // clear feedback when query changes
+  useEffect(() => {
+    if (error) setError('')
+    if (success) setSuccess('')
+  }, [query])
 
   useEffect(() => {
     let alive = true
@@ -42,6 +50,7 @@ export default function ArchivePage() {
       if (item.type === 'Officer') await api.officerRestore(token, item.id)
       else if (item.type === 'Batch') await api.batchRestore(token, item.id)
       setItems(prev => prev.filter(x => x.id !== item.id))
+      setSuccess(`${item.type} restored.`)
     } catch (e) { setError(e.message || 'Failed to restore') }
   }
 
@@ -60,7 +69,6 @@ export default function ArchivePage() {
             </div>
             <UserChip />
           </div>
-          {error && (<div className="text-sm text-red-700 mb-2">{error}</div>)}
           <div className="w-full max-w-sm">
             <input
               type="text"
@@ -70,12 +78,14 @@ export default function ArchivePage() {
               className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
             />
           </div>
+          {success && (<div className="text-sm text-green-700 bg-green-50 p-2 rounded mb-2">{success}</div>)}
+          {error && (<div className="text-sm text-red-700 mb-2">{error}</div>)}
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-[#7d102a] font-semibold text-sm">Archived Items</span>
           </div>
           <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] overflow-hidden border border-[#f7d6d6]">
             <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
-            <div className="overflow-x-auto no-scrollbar">
+            <ScrollableTableContainer className="no-scrollbar">
               <table className="min-w-[1800px] border-collapse">
                 <thead>
                   <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
@@ -136,7 +146,7 @@ export default function ArchivePage() {
                 ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollableTableContainer>
           </div>
         </div>
       </main>

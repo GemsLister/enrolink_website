@@ -6,6 +6,7 @@ import { useApi } from '../../hooks/useApi'
 import { api as clientApi } from '../../api/client'
 import UserChip from '../../components/UserChip'
 import enrolinkLogo from '../../assets/enrolink-logo 2.png'
+import ScrollableTableContainer from '../../components/ScrollableTableContainer'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
@@ -600,6 +601,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     fetchOfficerBatches()
   }, [fetchOfficerBatches])
 
+  useEffect(() => {
+    if (user?.role !== 'OFFICER') return
+    if (selectedBatchId) return
+    if (!officerBatches || officerBatches.length === 0) return
+    const first = officerBatches[0]
+    const id = first?.id || first?._id
+    if (id) setSelectedBatchId(id)
+  }, [user, officerBatches, selectedBatchId])
+
   const getSortOptions = (key) => {
     if (key === 'recordCategory' || key === 'remarks') {
       return null
@@ -836,41 +846,41 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               else if (bIdx === 3) comparison = 1
               else comparison = aIdx - bIdx
             }
-        } else if (key === 'interviewerDecision') {
-          const order = { PASSED: 0, FAILED: 1, 'NO RESULT': 2 }
-          const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
-          const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
-          if (direction === 'passed') {
-            if (aIdx === 0 && bIdx === 0) comparison = 0
-            else if (aIdx === 0) comparison = -1
-            else if (bIdx === 0) comparison = 1
-            else comparison = aIdx - bIdx
-          } else if (direction === 'failed') {
-            if (aIdx === 1 && bIdx === 1) comparison = 0
-            else if (aIdx === 1) comparison = -1
-            else if (bIdx === 1) comparison = 1
-            else comparison = aIdx - bIdx
-          } else if (direction === 'no-result') {
-            if (aIdx === 2 && bIdx === 2) comparison = 0
-            else if (aIdx === 2) comparison = -1
-            else if (bIdx === 2) comparison = 1
-            else comparison = aIdx - bIdx
-          }
-        } else if (key === 'enrollmentStatus') {
-          const order = { PENDING: 0, ENROLLED: 1 }
-          const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
-          const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
-          if (direction === 'pending') {
-            if (aIdx === 0 && bIdx === 0) comparison = 0
-            else if (aIdx === 0) comparison = -1
-            else if (bIdx === 0) comparison = 1
-            else comparison = aIdx - bIdx
-          } else if (direction === 'enrolled') {
-            if (aIdx === 1 && bIdx === 1) comparison = 0
-            else if (aIdx === 1) comparison = -1
-            else if (bIdx === 1) comparison = 1
-            else comparison = aIdx - bIdx
-          }
+          } else if (key === 'interviewerDecision') {
+            const order = { PASSED: 0, FAILED: 1, 'NO RESULT': 2 }
+            const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
+            const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
+            if (direction === 'passed') {
+              if (aIdx === 0 && bIdx === 0) comparison = 0
+              else if (aIdx === 0) comparison = -1
+              else if (bIdx === 0) comparison = 1
+              else comparison = aIdx - bIdx
+            } else if (direction === 'failed') {
+              if (aIdx === 1 && bIdx === 1) comparison = 0
+              else if (aIdx === 1) comparison = -1
+              else if (bIdx === 1) comparison = 1
+              else comparison = aIdx - bIdx
+            } else if (direction === 'no-result') {
+              if (aIdx === 2 && bIdx === 2) comparison = 0
+              else if (aIdx === 2) comparison = -1
+              else if (bIdx === 2) comparison = 1
+              else comparison = aIdx - bIdx
+            }
+          } else if (key === 'enrollmentStatus') {
+            const order = { PENDING: 0, ENROLLED: 1 }
+            const aIdx = order[String(aVal || '').toUpperCase()] ?? 99
+            const bIdx = order[String(bVal || '').toUpperCase()] ?? 99
+            if (direction === 'pending') {
+              if (aIdx === 0 && bIdx === 0) comparison = 0
+              else if (aIdx === 0) comparison = -1
+              else if (bIdx === 0) comparison = 1
+              else comparison = aIdx - bIdx
+            } else if (direction === 'enrolled') {
+              if (aIdx === 1 && bIdx === 1) comparison = 0
+              else if (aIdx === 1) comparison = -1
+              else if (bIdx === 1) comparison = 1
+              else comparison = aIdx - bIdx
+            }
           } else if (RATING_COLUMN_KEYS.has(key)) {
             const aNum = Number(aVal)
             const bNum = Number(bVal)
@@ -1460,7 +1470,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                     disabled={loadingBatches || officerBatches.length === 0}
                     className="rounded-full border border-rose-200 bg-white px-4 py-2 text-sm text-[#5b1a30] focus:border-rose-400 focus:outline-none disabled:opacity-60"
                   >
-                    <option value="">All assigned batches</option>
+                    <option value="" disabled>Select batch</option>
                     {officerBatches.map(batch => (
                       <option key={batch.id || batch._id} value={batch.id || batch._id}>{batch.code} ({batch.year})</option>
                     ))}
@@ -1540,8 +1550,15 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
 
         <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col min-h-0">
           <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
-          <div ref={tableScrollRef} onScroll={handleTableScroll} className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
-            <table className="min-w-[1800px] border-collapse">
+          <div className="flex-1 rounded-[32px] bg-white overflow-hidden border border-[#f7d6d6]">
+            <ScrollableTableContainer
+              containerRef={tableScrollRef}
+              wrapperClassName="flex-1 min-h-0"
+              overflowClass="flex-1 overflow-auto"
+              className="no-scrollbar"
+              containerProps={{ onScroll: handleTableScroll }}
+            >
+              <table className="min-w-[1800px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
                   <th style={{ minWidth: '60px' }} className="px-4 py-4 text-left sticky top-0 z-20 bg-[#f9c4c4]">
@@ -1888,12 +1905,14 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                   })}
               </tbody>
             </table>
+            </ScrollableTableContainer>
           </div>
-          {Boolean(sortMenuKey) && (
+
+          {sortMenuKey && (
             <div
               ref={sortMenuOverlayRef}
-              style={{ position: 'fixed', left: sortMenuPos.left, top: sortMenuPos.top }}
-              className="w-48 rounded-2xl border border-rose-100 bg-white shadow-2xl text-xs text-[#5b1a30] z-[1000]"
+              className="fixed z-50 w-52 rounded-2xl border border-rose-200 bg-white shadow-xl overflow-hidden"
+              style={{ left: sortMenuPos.left, top: sortMenuPos.top }}
             >
               <button
                 type="button"
@@ -1909,7 +1928,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                     key={option.value}
                     type="button"
                     className={`w-full px-4 py-2 text-left hover:bg-rose-50 ${
-                      (sortConfigs.find((s)=>s.key===sortMenuKey)?.direction || '') === option.value ? 'bg-rose-100 font-semibold' : ''
+                      (sortConfigs.find((s) => s.key === sortMenuKey)?.direction || '') === option.value
+                        ? 'bg-rose-100 font-semibold'
+                        : ''
                     }`}
                     onClick={() => handleSortChange(sortMenuKey, option.value)}
                   >

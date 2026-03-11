@@ -31,6 +31,13 @@ export default function UserChip() {
     } catch (_) {}
   }, [])
 
+  // sync dbName whenever user.name changes from auth context
+  useEffect(() => {
+    if (user?.name) {
+      setDbName(user.name)
+    }
+  }, [user?.name])
+
   useEffect(() => {
     let alive = true
     async function loadProfileAndAcceptances() {

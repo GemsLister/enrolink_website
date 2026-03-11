@@ -98,10 +98,11 @@ export function useAuth() {
     user,
     isAuthenticated,
     setToken,
+    setUser,
     login,
     logout,
     authHeader: token ? { Authorization: `Bearer ${token}` } : {},
-  }), [token, user, isAuthenticated, login, logout])
+  }), [token, user, isAuthenticated, login, logout, setUser])
 
   return value
 }

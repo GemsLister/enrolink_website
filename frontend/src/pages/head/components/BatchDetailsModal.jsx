@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { getStatusBadge } from '../../../utils/status'
 import { useAuth } from '../../../hooks/useAuth'
 import { useApi } from '../../../hooks/useApi'
+import ScrollableTableContainer from '../../../components/ScrollableTableContainer'
 
 export default function BatchDetailsModal({
   isOpen,
@@ -138,7 +139,7 @@ export default function BatchDetailsModal({
           <div className='col-3 flex justify-end w-full'>
             <button onClick={closeModal} aria-label="Close" className="text-gray-700 hover:text-gray-900 transition-colors">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="#6b2b2b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M6 18L18 6M6 6l12 12" stroke="#6b2b2b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
@@ -173,7 +174,7 @@ export default function BatchDetailsModal({
               <button onClick={() => setShowAdd(v => !v)} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">{showAdd ? 'Cancel' : 'Add Student'}</button>
             </div> */}
             {showMembers && (
-              <div className="mt-3 rounded-[32px] border border-[#f7d6d6] overflow-auto no-scrollbar">
+              <div className="mt-3 rounded-[32px] border border-[#f7d6d6] overflow-hidden flex flex-col min-h-0">
                 <div className="flex items-center justify-between gap-4 p-4">
                   <div className="w-full max-w-sm">
                     <input
@@ -199,33 +200,35 @@ export default function BatchDetailsModal({
                 ) : members.length === 0 ? (
                   <div className="p-4 text-sm text-gray-600">No members in this batch.</div>
                 ) : (
-                  <table className="min-w-[1000px] border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase sticky top-0 z-10">
-                        <th className="text-left px-4 py-3">Name</th>
-                        <th className="text-left px-4 py-3">Status</th>
-                        <th className="text-left px-4 py-3">Email</th>
-                        <th className="text-left px-4 py-3">Interview Date</th>
-                        <th className="text-left px-4 py-3">Exam Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredMembers.map(m => {
-                        const n1 = `${m.firstName} ${m.lastName}`.trim().toLowerCase()
-                        const n2 = `${m.lastName} ${m.firstName}`.trim().toLowerCase()
-                        const score = scoresMap.get(n1) ?? scoresMap.get(n2)
-                        return (
-                          <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fafafa]">
-                            <td className="px-4 py-2 text-gray-800">{`${m.lastName}, ${m.firstName}`}</td>
-                            <td className="px-4 py-2"><span className={getStatusBadge(m.status)}>{m.status}</span></td>
-                            <td className="px-4 py-2 text-gray-600">{m.email}</td>
-                            <td className="px-4 py-2 text-gray-600">{m.interviewDate || '-'}</td>
-                            <td className="px-4 py-2 text-gray-800">{score ?? '-'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                  <ScrollableTableContainer wrapperClassName="flex-1 min-h-0" overflowClass="overflow-auto" className="no-scrollbar">
+                    <table className="min-w-[1000px] border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase sticky top-0 z-10">
+                          <th className="text-left px-4 py-3">Name</th>
+                          <th className="text-left px-4 py-3">Status</th>
+                          <th className="text-left px-4 py-3">Email</th>
+                          <th className="text-left px-4 py-3">Interview Date</th>
+                          <th className="text-left px-4 py-3">Exam Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMembers.map(m => {
+                          const n1 = `${m.firstName} ${m.lastName}`.trim().toLowerCase()
+                          const n2 = `${m.lastName} ${m.firstName}`.trim().toLowerCase()
+                          const score = scoresMap.get(n1) ?? scoresMap.get(n2)
+                          return (
+                            <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fafafa]">
+                              <td className="px-4 py-2 text-gray-800">{`${m.lastName}, ${m.firstName}`}</td>
+                              <td className="px-4 py-2"><span className={getStatusBadge(m.status)}>{m.status}</span></td>
+                              <td className="px-4 py-2 text-gray-600">{m.email}</td>
+                              <td className="px-4 py-2 text-gray-600">{m.interviewDate || '-'}</td>
+                              <td className="px-4 py-2 text-gray-800">{score ?? '-'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </ScrollableTableContainer>
                 )}
               </div>
             )}

@@ -9,6 +9,7 @@ import AddBatchModal from './components/AddBatchModal'
 import ImportModal from './components/ImportModal'
 import BatchDetailsModal from './components/BatchDetailsModal'
 import UserChip from '../../components/UserChip'
+import ScrollableTableContainer from '../../components/ScrollableTableContainer'
 
 export default function BatchManagement({ embedded = false }) {
     const { isAuthenticated, user, token } = useAuth()
@@ -16,6 +17,7 @@ export default function BatchManagement({ embedded = false }) {
     const { id: routeBatchId } = useParams()
   const {
       batches, batchesLoading, query,
+      success, error,
       filterBatch, filterStatus, filterInterviewer,
       sortField, sortDir, selectedIds,
       batchOptions, statusOptions, interviewerOptions,
@@ -71,8 +73,10 @@ export default function BatchManagement({ embedded = false }) {
                   handleDeleteSelected={handleDeleteSelected}
                   handleAddBatch={handleAddBatch}
                 />
+            {success && <div className="text-sm text-green-700 bg-green-50 p-2 rounded mb-2">{success}</div>}
+            {error && <div className="text-sm text-red-700 mb-2">{error}</div>}
             <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 overflow-hidden border border-[#f7d6d6]">
-              <div className="overflow-x-auto no-scrollbar">
+              <ScrollableTableContainer className="no-scrollbar">
                 <BatchesTable
                   batchesLoading={batchesLoading}
                   displayedBatches={displayedBatches}
@@ -91,7 +95,7 @@ export default function BatchManagement({ embedded = false }) {
                   statusOptions={statusOptions}
                   onChangeStatus={(batch, label) => updateBatchStatus(batch, label)}
                 />
-              </div>
+              </ScrollableTableContainer>
             </div>
           </div>
         </main>

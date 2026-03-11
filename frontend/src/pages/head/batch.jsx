@@ -6,6 +6,7 @@ import { getCategoryBadge } from '../../utils/status'
 import { useBatchManagement } from './hooks/useBatchManagement'
 import { useApi } from '../../hooks/useApi'
 import AddPassedStudentsModal from './components/AddPassedStudentsModal'
+import ScrollableTableContainer from '../../components/ScrollableTableContainer'
 
 export default function BatchPage() {
   const { isAuthenticated, user, token } = useAuth()
@@ -106,26 +107,30 @@ export default function BatchPage() {
       <Sidebar />
       <div className="flex-1 h-[100dvh] bg-[#fff6f7] overflow-hidden">
         <div className="h-full flex flex-col px-10 pt-10 pb-8 space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">{selectedBatch ? `BATCH-${selectedBatch.code}` : 'BATCH'}</h1>
-            <p className="text-base text-[#8b4a5d] mt-3">List of Students</p>
-            <div className="w-full max-w-sm mt-3">
-              <input
-                type="text"
-                value={membersQuery}
-                onChange={(e) => setMembersQuery(e.target.value)}
-                placeholder="Search name or email"
-                className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
-              />
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-extrabold tracking-[0.28em] text-[#7d102a]">{selectedBatch ? `BATCH-${selectedBatch.code}` : 'BATCH'}</h1>
+              <p className="text-base text-[#8b4a5d] mt-3">List of Students</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/head/batch-management')} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Back</button>
-            <button onClick={generateReport} disabled={reportLoading} className="rounded-full bg-[#6b2b5f] px-8 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#5a1f4f] disabled:opacity-50 disabled:cursor-not-allowed">{reportLoading ? 'Generating...' : 'Generate Report'}</button>
-            <button onClick={() => setShowAddModal(true)} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 hover:bg-[#a62a49]">Add Student</button>
+
+          <div className="w-full max-w-sm">
+            <input
+              type="text"
+              value={membersQuery}
+              onChange={(e) => setMembersQuery(e.target.value)}
+              placeholder="Search name or email"
+              className="w-full rounded-full border border-rose-200 bg-white px-5 py-3 text-sm text-[#5b1a30] placeholder:text-black-300 focus:border-black-400 focus:outline-none"
+            />
           </div>
-        </div>
+
+          <div className="flex justify-end">
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate('/head/batch-management')} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Back</button>
+              <button onClick={generateReport} disabled={reportLoading} className="rounded-full bg-[#6b2b5f] px-8 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#5a1f4f] disabled:opacity-50 disabled:cursor-not-allowed">{reportLoading ? 'Generating...' : 'Generate Report'}</button>
+              <button onClick={() => setShowAddModal(true)} className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 hover:bg-[#a62a49]">Add Student</button>
+            </div>
+          </div>
 
         <AddPassedStudentsModal
           isOpen={showAddModal}
@@ -139,8 +144,9 @@ export default function BatchPage() {
 
         <div className="flex-1 rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 flex flex-col min-h-0">
           <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
-          <div className="flex-1 overflow-auto no-scrollbar rounded-[32px] border border-[#f7d6d6] pb-2">
-            <table className="w-full min-w-[720px] border-collapse table-fixed">
+          <div className="flex-1 rounded-[32px] bg-white overflow-hidden border border-[#f7d6d6] flex flex-col min-h-0">
+            <ScrollableTableContainer wrapperClassName="flex-1 min-h-0" overflowClass="flex-1 overflow-auto" className="no-scrollbar">
+              <table className="w-full min-w-[720px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase sticky top-0 z-10">
                   <th className="text-left px-4 py-3">Name</th>
@@ -157,15 +163,16 @@ export default function BatchPage() {
                   <tr><td colSpan={4} className="px-5 py-10 text-center text-gray-600">No students in this batch</td></tr>
                 )}
                 {!membersLoading && filteredMembers.map((m) => (
-                  <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fafafa]">
-                    <td className="px-4 py-2 text-gray-800">{`${m.lastName}, ${m.firstName}`}</td>
+                  <tr key={m.id} className="border-t border-[#f3d5d5] odd:bg-white even:bg-[#fff2f4]">
+                    <td className="px-4 py-2 text-[#5b1a30]">{`${m.lastName}, ${m.firstName}`}</td>
                     <td className="px-4 py-2"><span className={getCategoryBadge(m.recordCategory)}>{m.recordCategory || 'Applicant'}</span></td>
-                    <td className="px-4 py-2 text-gray-600">{m.email}</td>
-                    <td className="px-4 py-2 text-gray-600">{m.interviewDate || '-'}</td>
+                    <td className="px-4 py-2 text-[#7c3a4a]">{m.email}</td>
+                    <td className="px-4 py-2 text-[#7c3a4a]">{m.interviewDate || '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </ScrollableTableContainer>
           </div>
         </div>
 
@@ -177,7 +184,6 @@ export default function BatchPage() {
                 <h2 className="text-2xl font-bold text-[#5b1a30]">Batch Report - {selectedBatch?.code}</h2>
                 <div className="flex items-center gap-3">
                   <button onClick={handleDownloadPdf} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition font-medium text-sm">Download PDF</button>
-                  <button onClick={() => window.print()} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition font-medium text-sm">Print</button>
                   <button onClick={() => setShowReportModal(false)} className="text-[#5b1a30] hover:text-[#3d0a1f] font-bold text-2xl">×</button>
                 </div>
               </div>
@@ -194,6 +200,6 @@ export default function BatchPage() {
         )}
       </div>
     </div>
-  </div>
+    </div>
   )
 }

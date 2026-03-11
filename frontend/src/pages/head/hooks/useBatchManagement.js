@@ -29,6 +29,8 @@ export function useBatchManagement(token, opts = {}) {
 
   const [batches, setBatches] = useState([])
   const [batchesLoading, setBatchesLoading] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [filterBatch, setFilterBatch] = useState('All')
@@ -118,8 +120,18 @@ export function useBatchManagement(token, opts = {}) {
       setBatches(prev => prev.filter(s => !selectedIds.has(s.id)))
       try { window.dispatchEvent(new CustomEvent('batches:updated', { detail: { removed: ids } })) } catch (_) {}
       clearSelection()
-    } catch (_) {}
+      setSuccess(`Archived ${ids.length} batch${ids.length > 1 ? 'es' : ''}.`)
+      setError('')
+    } catch (e) {
+      setSuccess('')
+      setError(e?.message || 'Failed to archive batch. Please try again.')
+    }
   }
+
+  useEffect(() => {
+    if (error) setError('')
+    if (success) setSuccess('')
+  }, [query])
 
   const activeChips = useMemo(() => {
     const chips = []
@@ -549,6 +561,7 @@ export function useBatchManagement(token, opts = {}) {
       batchId: selectedBatch.id,
       batch: selectedBatch.year,
       interviewer: selectedBatch.interviewer || '',
+      recordCategory: 'applicants',
     }
     if (addValues.candidateId) payload.id = addValues.candidateId
     const rawDate = (addValues.interviewDate || '').trim()
@@ -582,14 +595,21 @@ export function useBatchManagement(token, opts = {}) {
           }
           await api.post('/reports/records', rep)
         }
-      } catch (_) {}
-    } catch (_) {}
+      } catch (e) { 
+        console.error('Error creating interview record:', e);
+      }
+    } catch (e) { 
+      console.error('Error adding student:', e);
+      alert(e.message || 'Failed to add student to batch');
+    }
   }
 
   return {
     // data/state
     batches,
     batchesLoading,
+    success,
+    error,
     query,
     filterBatch,
     filterStatus,
@@ -626,6 +646,8 @@ export function useBatchManagement(token, opts = {}) {
 
     // setters/handlers
     setQuery,
+    setSuccess,
+    setError,
     setFilterBatch,
     setFilterStatus,
     setFilterInterviewer,

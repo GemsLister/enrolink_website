@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import Union from "../../assets/Union.png";
 import UserChip from "../../components/UserChip";
+import ScrollableTableContainer from "../../components/ScrollableTableContainer";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/client";
 
@@ -15,16 +16,20 @@ export default function EnrollmentOfficers() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [officers, setOfficers] = useState([]);
   const [archivedOfficers, setArchivedOfficers] = useState([]);
-  const [selectedOfficers, setSelectedOfficers] = useState([]);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [query, setQuery] = useState("");
+
+  // clear feedback when the user interacts or the query/email changes
+  useEffect(() => {
+    if (error) setError("");
+    if (success) setSuccess("");
+  }, [query, email, batchCode]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [officerToArchive, setOfficerToArchive] = useState(null);
-  const [showBulkArchiveModal, setShowBulkArchiveModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
   
   const [invites, setInvites] = useState([]);
@@ -32,49 +37,11 @@ export default function EnrollmentOfficers() {
   const [invitesError, setInvitesError] = useState("");
 
   
-
-  const toggleOfficerSelection = (officerId) => {
-    setSelectedOfficers((prev) =>
-      prev.includes(officerId)
-        ? prev.filter((id) => id !== officerId)
-        : [...prev, officerId]
-    );
-  };
-
-  const toggleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedOfficers(officers.map((officer) => officer._id));
-    } else {
-      setSelectedOfficers([]);
-    }
-  };
-
-  const removeSelectedOfficers = async () => {
-    if (!selectedOfficers.length) return;
-    try {
-      setIsDeleting(true);
-      await Promise.all(
-        selectedOfficers.map((id) => api.officerArchive(token, id))
-      );
-      setOfficers((list) =>
-        list.filter((o) => !selectedOfficers.includes(o._id))
-      );
-      setSelectedOfficers([]);
-      setShowBulkArchiveModal(false);
-      navigate('/head/archive');
-    } catch (err) {
-      console.error("Error removing officers:", err);
-      setError("Failed to remove officers. Please try again.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const removeOfficer = async (officer) => {
     try {
       await api.officerArchive(token, officer._id);
       setOfficers((list) => list.filter((o) => o._id !== officer._id));
-      navigate('/head/archive');
+      setSuccess('Officer archived.');
     } catch (err) {
       console.error("Error removing officer:", err);
       setError("Failed to remove officer. Please try again.");
@@ -222,7 +189,6 @@ export default function EnrollmentOfficers() {
             </div>
             <UserChip />
           </div>
-
         <div className="flex items-center gap-4 mb-4">
           <div className="w-full max-w-sm">
             <input
@@ -235,27 +201,19 @@ export default function EnrollmentOfficers() {
           </div>
           <button onClick={() => { setShowPendingModal(true); loadInvites(); }} className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400">Pending invites</button>
         </div>
+        {/* success / error messages */}
+        {success && <div className="text-sm text-green-700 bg-green-50 p-2 rounded mb-2">{success}</div>}
+        {error && <div className="text-sm text-red-700 mb-2">{error}</div>}
 
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-[#7d102a] font-semibold text-sm">Current Officers</span>
           <button onClick={() => setShowAddModal(true)} className="rounded-full bg-[#c4375b] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]">Add Officer</button>
         </div>
         <div className="rounded-[32px] bg-white shadow-[0_35px_90px_rgba(239,150,150,0.35)] p-0 overflow-hidden border border-[#f7d6d6]">
-          <div className="overflow-x-auto no-scrollbar">
+          <ScrollableTableContainer className="no-scrollbar">
             <table className="min-w-[1800px] border-collapse">
               <thead>
                 <tr className="bg-[#f9c4c4] text-[#5b1a30] text-xs font-semibold uppercase">
-                  <th className="w-12 px-4 py-4 text-center sticky top-0 z-20 bg-[#f9c4c4]">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 text-[#6b0000] focus:ring-[#6b0000] border-gray-300 rounded"
-                      checked={
-                        selectedOfficers.length > 0 &&
-                        selectedOfficers.length === officers.length
-                      }
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
                   <th className="w-56 text-left px-4 py-4 sticky top-0 z-20 bg-[#f9c4c4]">
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-[12px] tracking-[0.2em] text-[#5b1a30]" style={{ fontFamily: 'var(--font-open-sans)' }}>Name</span>
@@ -304,16 +262,8 @@ export default function EnrollmentOfficers() {
                   .map((officer, idx) => (
                   <tr
                     key={officer._id}
-                    className={`border-b border-[#f3d5d5] hover:bg-rose-50 ${selectedOfficers.includes(officer._id) ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-[#fff2f4]')}`}
+                    className={`border-b border-[#f3d5d5] hover:bg-rose-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-[#fff2f4]'}`}
                   >
-                    <td className="w-12 px-4 py-3 text-center align-middle whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-[#6b0000] focus:ring-[#6b0000] border-gray-300 rounded"
-                        checked={selectedOfficers.includes(officer._id)}
-                        onChange={() => toggleOfficerSelection(officer._id)}
-                      />
-                    </td>
                     <td className="w-56 py-2 px-3 text-[#5b1a30] align-middle whitespace-nowrap text-left">
                       {officer.name || "-"}
                     </td>
@@ -342,41 +292,23 @@ export default function EnrollmentOfficers() {
                 ))}
               </tbody>
             </table>
-            {selectedOfficers.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setShowBulkArchiveModal(true)}
-                  disabled={isDeleting}
-                  className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49] disabled:opacity-60"
-                >
-                  {isDeleting
-                    ? "Archiving..."
-                    : `Archive Selected (${selectedOfficers.length})`}
-                </button>
-              </div>
-            )}
-          </div>
+          </ScrollableTableContainer>
         </div>
 
         {showAddModal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-            <div className="bg-pink-200 rounded-xl shadow-lg w-full max-w-[520px] p-7 mx-auto border border-pink-400">
+            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[520px] p-7 mx-auto border-2 border-[#6b2b2b]">
               <div className="relative text-center mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Add Enrollment Officer</h2>
                 <button onClick={() => setShowAddModal(false)} aria-label="Close" className="absolute top-2 right-3 text-gray-700 hover:text-gray-900 transition-colors rounded-full p-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
-                <div className="flex justify-center mt-4">
-                  <svg className="w-24 h-24 text-white" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </div>
               </div>
               {error && <div className="text-sm text-red-700 mb-2">{error}</div>}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-white font-semibold text-sm text-left">Gmail</label>
-                  <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full" />
+                  <label className="text-[#5b1a30] font-semibold text-sm text-left">Gmail</label>
+                  <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="officer@gmail.com" className="bg-white border border-rose-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-rose-300" />
                   {duplicateOfficer && (
                     <div className="text-xs text-red-700">Officer already exists</div>
                   )}
@@ -385,8 +317,8 @@ export default function EnrollmentOfficers() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-white font-semibold text-sm text-left">Assign Batch</label>
-                  <select value={batchCode} onChange={(e)=>setBatchCode(e.target.value)} className="bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full">
+                  <label className="text-[#5b1a30] font-semibold text-sm text-left">Assign Batch</label>
+                  <select value={batchCode} onChange={(e)=>setBatchCode(e.target.value)} className="bg-white border border-rose-200 rounded-full px-4 py-2 text-sm text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-rose-300">
                     <option value="">None</option>
                     {batches.map((b)=> (
                       <option key={b._id} value={b.code}>{b.code}</option>
@@ -394,7 +326,7 @@ export default function EnrollmentOfficers() {
                   </select>
                 </div>
                 <div className="mt-2">
-                  <button onClick={async ()=>{ const ok = await invite(); if (ok) setShowAddModal(false); }} disabled={loading || !email.trim() || duplicateOfficer || duplicateArchivedOfficer} className="bg-pink-800 disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-pink-900 transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
+                  <button onClick={async ()=>{ const ok = await invite(); if (ok) setShowAddModal(false); }} disabled={loading || !email.trim() || duplicateOfficer || duplicateArchivedOfficer} className="bg-[#6b0000] disabled:opacity-60 text-white px-6 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm w-full">{loading ? 'Sending…' : 'Send Invite'}</button>
                 </div>
               </div>
             </div>
@@ -407,7 +339,7 @@ export default function EnrollmentOfficers() {
               <div className="relative text-center mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Archive this officer?</h2>
                 <button onClick={() => setShowArchiveModal(false)} aria-label="Close" className="absolute top-2 right-3 text-gray-700 hover:text-gray-900 transition-colors rounded-full p-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               <p className="text-sm text-[#2f2b33] text-center mb-5">This action will remove it from active lists but you can restore it from the archive at any time.</p>
@@ -419,31 +351,13 @@ export default function EnrollmentOfficers() {
           </div>
         )}
 
-        {showBulkArchiveModal && selectedOfficers.length > 0 && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-            <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[500px] p-7 mx-auto border-2 border-[#6b2b2b]">
-              <div className="relative text-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Archive selected officers?</h2>
-                <button onClick={() => setShowBulkArchiveModal(false)} aria-label="Close" className="absolute top-2 right-3 text-gray-700 hover:text-gray-900 transition-colors rounded-full p-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-              </div>
-              <p className="text-sm text-[#2f2b33] text-center mb-5">This will archive {selectedOfficers.length} officer(s). You can restore them from the archive at any time.</p>
-              <div className="flex gap-3 justify-center">
-                <button onClick={removeSelectedOfficers} className="bg-[#6b0000] text-white px-4 py-2 rounded-full hover:bg-[#8b0000] transition-colors duration-200 font-medium text-sm">Continue</button>
-                <button onClick={()=> setShowBulkArchiveModal(false)} className="bg-white text-[#6b0000] border border-[#6b2b2b] px-4 py-2 rounded-full hover:bg-pink-50 transition-colors duration-200 font-medium text-sm">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {showPendingModal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="bg-gradient-to-b from-red-300 to-pink-100 rounded-3xl shadow-lg w-full max-w-[800px] p-7 mx-auto border-2 border-[#6b2b2b]">
               <div className="relative mb-4">
                 <div className="bg-[#e9a9b6] text-white font-semibold px-6 py-3 rounded-2xl">Pending Invites</div>
                 <button onClick={() => setShowPendingModal(false)} aria-label="Close" className="absolute top-2 right-3 text-gray-700 hover:text-gray-900 transition-colors rounded-full p-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               {invitesError && <div className="text-sm text-red-700 mb-2">{invitesError}</div>}

@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useApi } from '../../hooks/useApi'
 
 export default function Settings() {
-  const { isAuthenticated, user, token } = useAuth()
+  const { isAuthenticated, user, token, setUser } = useAuth()
   const api = useApi(token)
   const [profile, setProfile] = useState({ name: '', firstName: '', lastName: '', email: '', department: '', phone: '' })
   const [prefs, setPrefs] = useState({ notifEmail: true, notifInterview: true, notifSystem: true })
@@ -101,6 +101,10 @@ export default function Settings() {
       const firstName = parts[0] || ''
       const lastName = parts.slice(1).join(' ') || ''
       setProfile(p => ({ ...p, name: nm, firstName, lastName, department: res.user?.department || p.department, phone: res.user?.phone || p.phone }))
+      // update auth context & cache so UserChip updates immediately
+      if (res.user) {
+        try { setUser(res.user) } catch (_){ }
+      }
       try { localStorage.setItem('userProfile', JSON.stringify(res.user || { name: nm, email: profile.email, department: res.user?.department || p.department, phone: res.user?.phone || p.phone, role: 'DEPT_HEAD' })) } catch (_) {}
       setMsg('Personal information updated')
     } catch (e) { setErr(e.message) } finally { setSavingProfile(false) }
