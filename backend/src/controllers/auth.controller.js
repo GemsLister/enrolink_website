@@ -356,8 +356,8 @@ export async function requestPasswordReset(req, res, next) {
       user = await OfficerUser.findOne({ email });
     }
     if (!user) {
-      // Do not disclose whether the email exists
-      return res.json({ message: 'If the email is registered, a reset link has been sent.' });
+      // Reject unregistered email with error message
+      return next(badRequest('Email not found. Please check and try again.'));
     }
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60000);
@@ -367,10 +367,10 @@ export async function requestPasswordReset(req, res, next) {
     try {
       await sendPasswordResetEmail(user.email, resetLink);
     } catch (mailErr) {
-      // If email sending fails, still respond generically to avoid enumeration
-      return res.json({ message: 'If the email is registered, a reset link has been sent.' });
+      // If email sending fails, return error to user
+      return next(badRequest('Failed to send password reset email. Please try again.'));
     }
-    res.json({ message: 'If the email is registered, a reset link has been sent.' });
+    res.json({ message: 'A password reset email has been sent. Please check your inbox.' });
   } catch (e) { next(e); }
 }
 
