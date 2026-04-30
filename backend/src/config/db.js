@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 
 export let officersConn = null;
 export let recordsConn = null;
@@ -22,6 +23,9 @@ export function getArchivesConn() {
 }
 
 export async function connectDb() {
+  // Set custom DNS servers to resolve MongoDB Atlas SRV records
+  dns.setServers(['1.1.1.1', '1.0.0.1']);
+
   const headUri = process.env.MONGODB_ATLAS_URI_HEAD;
   const officersUri = process.env.MONGODB_ATLAS_URI_OFFICERS;
   const recordsUri = process.env.MONGODB_ATLAS_URI_RECORDS;

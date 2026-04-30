@@ -133,33 +133,37 @@ export async function upsert(req, res, next) {
     const { id, __v, ...data } = req.body;
 
     // Validate required fields
-    const firstName = String(data.firstName || '').trim();
-    const lastName = String(data.lastName || '').trim();
-    if (!firstName || !lastName) {
-      return res.status(400).json({ error: 'First name and last name are required' });
+    let requiredFields = [];
+    if (kind === 'applicants') {
+      requiredFields = ['number', 'batch', 'course', 'examineeNo', 'source', 'firstName', 'lastName', 'middleName', 'email', 'percentileScore', 'shsStrand', 'shs', 'contact', 'shsGpa', 'interviewDate'];
+    } else if (kind === 'enrollees') {
+      requiredFields = ['course', 'batch', 'examineeNo', 'firstName', 'lastName', 'middleName', 'email', 'contact', 'enrollmentStatus'];
+    } else if (kind === 'students') {
+      requiredFields = ['course', 'batch', 'examineeNo', 'firstName', 'lastName', 'middleName', 'email', 'contact', 'interviewDate'];
+    }
+    const missingFields = requiredFields.filter(field => !String(data[field] || '').trim());
+    if (missingFields.length > 0) {
+      return res.status(400).json({ error: `The following fields are required: ${missingFields.join(', ')}` });
     }
 
-    // Validate email format if provided
-    if (data.email) {
-      const email = String(data.email || '').trim();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (email && !emailRegex.test(email)) {
-        return res.status(400).json({ error: 'Invalid email format' });
-      }
+    // Validate email format
+    const email = String(data.email || '').trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Validate contact number format if provided
-    if (data.contact) {
-      const contact = String(data.contact || '').trim();
-      const contactRegex = /^[0-9+\-\s()]{7,}$/;
-      if (contact && !contactRegex.test(contact)) {
-        return res.status(400).json({ error: 'Invalid contact number format' });
-      }
+    // Validate contact number format
+    const contact = String(data.contact || '').trim();
+    const contactRegex = /^[0-9+\-\s()]{7,}$/;
+    if (!contactRegex.test(contact)) {
+      return res.status(400).json({ error: 'Invalid contact number format' });
     }
 
     // Validate enrollee-specific fields
     if (kind === 'enrollees') {
-      if (data.enrollmentStatus && !['ENROLLED', 'PENDING'].includes(String(data.enrollmentStatus).toUpperCase())) {
+      const status = String(data.enrollmentStatus).toUpperCase();
+      if (!['ENROLLED', 'PENDING'].includes(status)) {
         return res.status(400).json({ error: 'Invalid enrollment status. Must be ENROLLED or PENDING' });
       }
     }
@@ -171,6 +175,12 @@ export async function upsert(req, res, next) {
     }
     if (data.preferredCourse && !VALID_COURSES.includes(String(data.preferredCourse).trim())) {
       return res.status(400).json({ error: `Invalid preferred course. Must be one of: ${VALID_COURSES.join(', ')}` });
+    }
+
+    // Validate batch - must be one of the allowed academic years
+    const VALID_BATCHES = ['2026-2027', '2027-2028', '2028-2029', '2029-2030'];
+    if (data.batch && !VALID_BATCHES.includes(String(data.batch).trim())) {
+      return res.status(400).json({ error: `Invalid batch. Must be one of: ${VALID_BATCHES.join(', ')}` });
     }
 
     const nameSignature = buildNameSignature(data);

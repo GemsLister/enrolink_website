@@ -10,6 +10,7 @@ import ScrollableTableContainer from '../../components/ScrollableTableContainer'
 
 const APPLICANT_COLUMNS = [
   { key: 'number', label: 'No.', width: '90px' },
+  { key: 'batch', label: 'Batch', width: '120px' },
   { key: 'course', label: 'Course', width: '140px' },
   { key: 'examineeNo', label: 'Examinee No.', width: '160px' },
   { key: 'source', label: 'Source', width: '140px' },
@@ -49,6 +50,7 @@ const APPLICANT_COLUMNS = [
 
 const ENROLLEE_COLUMNS = [
   { key: 'course', label: 'Course', width: '140px' },
+  { key: 'batch', label: 'Batch', width: '120px' },
   { key: 'examineeNo', label: 'Enrollee No.', width: '160px' },
   { key: 'lastName', label: 'Lastname', width: '160px' },
   { key: 'firstName', label: 'Firstname', width: '160px' },
@@ -63,6 +65,7 @@ const ENROLLEE_COLUMNS = [
 
 const STUDENT_COLUMNS = [
   { key: 'course', label: 'Course', width: '140px' },
+  { key: 'batch', label: 'Batch', width: '120px' },
   { key: 'examineeNo', label: 'Student No.', width: '160px' },
   { key: 'lastName', label: 'Lastname', width: '160px' },
   { key: 'firstName', label: 'Firstname', width: '160px' },
@@ -76,6 +79,7 @@ const STUDENT_COLUMNS = [
 
 const IMPORT_HEADERS_APPLICANTS = [
   { key: 'number', label: 'no.' },
+  { key: 'batch', label: 'batch' },
   { key: 'course', label: 'course' },
   { key: 'examineeNo', label: 'examinee no.' },
   { key: 'source', label: 'source' },
@@ -105,6 +109,7 @@ const IMPORT_HEADERS_APPLICANTS = [
 
 const IMPORT_HEADERS_STUDENTS = [
   { key: 'course', label: 'course' },
+  { key: 'batch', label: 'batch' },
   { key: 'examineeNo', label: 'student_no' },
   { key: 'lastName', label: 'lastname' },
   { key: 'firstName', label: 'firstname' },
@@ -116,6 +121,7 @@ const IMPORT_HEADERS_STUDENTS = [
 
 const IMPORT_HEADERS_ENROLLEES = [
   { key: 'course', label: 'course' },
+  { key: 'batch', label: 'batch' },
   { key: 'examineeNo', label: 'enrollee_no' },
   { key: 'lastName', label: 'lastname' },
   { key: 'firstName', label: 'firstname' },
@@ -141,6 +147,7 @@ const SHS_STRAND_OPTIONS = ['STEM', 'ABM', 'HUMSS', 'TVL-ICT']
 const DECISION_OPTIONS = ['PASSED', 'FAILED', 'NO RESULT']
 const SOURCE_OPTIONS = ['WAITLIST', 'PRIORITY', 'VVIP']
 const ENROLLMENT_STATUS_OPTIONS = ['ENROLLED', 'PENDING']
+const BATCH_OPTIONS = ['2026-2027', '2027-2028', '2028-2029', '2029-2030']
 const VIEW_TO_CATEGORY = {
   applicants: 'Applicant',
   enrollees: 'Enrollee',
@@ -158,16 +165,16 @@ const EMPTY_RECORD = ALL_COLUMN_KEYS.reduce((acc, key) => {
 
 const VIEW_META = {
   enrollees: {
-    title: 'Enrollee Records',
-    subtitle: 'List of First Year Enrollees.',
+    title: 'Passers Records',
+    subtitle: 'List of First Year Passers.',
   },
   applicants: {
     title: 'Applicant Records',
     subtitle: 'List of First Year Applicants.',
   },
   students: {
-    title: 'Student Records',
-    subtitle: 'List of First Year Students.',
+    title: 'Enrolled Students Records',
+    subtitle: 'List of First Year Enrolled Students.',
   },
 }
 
@@ -180,13 +187,13 @@ const CARD_DEFS = [
   },
   {
     key: 'enrollees',
-    title: 'Enrollees',
+    title: 'Passers',
     description: 'Confirmed learners already slotted for the term.',
     accent: 'from-rose-200 to-rose-100',
   },
   {
     key: 'students',
-    title: 'Students',
+    title: 'Enrolled Students',
     description: 'Returning students progressing through the program.',
     accent: 'from-rose-200 to-amber-100',
   },
@@ -490,6 +497,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
   const [officerBatches, setOfficerBatches] = useState([])
   const [selectedBatchId, setSelectedBatchId] = useState('')
   const [loadingBatches, setLoadingBatches] = useState(false)
+  const [batchYearFilter, setBatchYearFilter] = useState('')
   
 
   const isArchiveView = view === 'archive'
@@ -507,6 +515,11 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     : currentView.subtitle
   const isStudentView = (isArchiveView ? archiveType === 'students' : view === 'students')
   const isEnrolleeView = (isArchiveView ? archiveType === 'enrollees' : view === 'enrollees')
+  const categoryOptions = useMemo(() => {
+    if (isStudentView) return CATEGORY_OPTIONS.filter((option) => option !== 'Applicant')
+    if (!isEnrolleeView) return CATEGORY_OPTIONS.filter((option) => option !== 'Student')
+    return CATEGORY_OPTIONS
+  }, [isStudentView, isEnrolleeView])
   const columns = isStudentView ? STUDENT_COLUMNS : isEnrolleeView ? ENROLLEE_COLUMNS : APPLICANT_COLUMNS
   const importHeaders = isStudentView
     ? IMPORT_HEADERS_STUDENTS
@@ -529,6 +542,10 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       if (user?.role === 'OFFICER' && selectedBatchId) {
         params.batchId = selectedBatchId
       }
+      // If head user and a batch year is selected, filter by that batch year
+      if (user?.role !== 'OFFICER' && batchYearFilter) {
+        params.batch = batchYearFilter
+      }
       const queryString = Object.keys(params)
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
         .join('&')
@@ -544,7 +561,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     } finally {
       setLoading(false)
     }
-  }, [api, currentCategory, isArchiveView, setBanner, user, selectedBatchId])
+  }, [api, currentCategory, isArchiveView, setBanner, user, selectedBatchId, batchYearFilter])
 
   useEffect(() => {
     fetchRows()
@@ -1026,10 +1043,17 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
         top: tableScrollRef.current.scrollTop || 0,
       }
     }
-    const requiredFields = ['firstName', 'lastName']
-    const missingField = requiredFields.find((field) => !normalizeText(editingValues[field]))
-    if (missingField) {
-      setBanner({ type: 'error', message: 'Firstname and Lastname are required.' })
+    let requiredFields = []
+    if (currentCategory === 'Applicant') {
+      requiredFields = ['number', 'batch', 'course', 'examineeNo', 'source', 'firstName', 'lastName', 'middleName', 'email', 'percentileScore', 'shsStrand', 'shs', 'contact', 'shsGpa', 'interviewDate']
+    } else if (currentCategory === 'Enrollee') {
+      requiredFields = ['course', 'batch', 'examineeNo', 'firstName', 'lastName', 'middleName', 'email', 'contact', 'enrollmentStatus']
+    } else if (currentCategory === 'Student') {
+      requiredFields = ['course', 'batch', 'examineeNo', 'firstName', 'lastName', 'middleName', 'email', 'contact', 'interviewDate']
+    }
+    const missingFields = requiredFields.filter((field) => !normalizeText(editingValues[field]))
+    if (missingFields.length > 0) {
+      setBanner({ type: 'error', message: `The following fields are required: ${missingFields.join(', ')}.` })
       return
     }
     const payload = { ...editingValues }
@@ -1082,7 +1106,8 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
     const handler = (event) => {
       if (!editingRowRef.current) return
       if (!editingRowRef.current.contains(event.target)) {
-        cancelEditing()
+        // Don't cancel editing when clicking outside - users must explicitly cancel or save
+        // cancelEditing()
       }
     }
     document.addEventListener('mousedown', handler)
@@ -1375,6 +1400,9 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
       if (row._id) payload.id = row._id
       if (row.__v !== undefined) payload.__v = row.__v
       payload.recordCategory = next
+      if (currentCategory === 'Applicant' && next === 'Enrollee') {
+        payload.enrollmentStatus = 'PENDING'
+      }
       await api.post('/students', payload)
       setBanner({ type: 'success', message: 'Status updated.' })
       await fetchRows()
@@ -1460,7 +1488,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
               </div>
 
               <div className="flex flex-wrap gap-3 justify-end">
-            {user?.role === 'OFFICER' && (
+            {user?.role === 'OFFICER' ? (
               <div className="flex items-center gap-2">
                 <label htmlFor="batch-select" className="text-sm font-medium text-[#5b1a30]">Batch:</label>
                   <select
@@ -1485,6 +1513,21 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                     ↻
                   </button>
               </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <label htmlFor="batch-year-filter" className="text-sm font-medium text-[#5b1a30]">Batch:</label>
+                <select
+                  id="batch-year-filter"
+                  value={batchYearFilter}
+                  onChange={e => setBatchYearFilter(e.target.value)}
+                  className="rounded-full border border-rose-200 bg-white px-4 py-2 text-sm text-[#5b1a30] focus:border-rose-400 focus:outline-none"
+                >
+                  <option value="">All Batches</option>
+                  {BATCH_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
             )}
             <button
               type="button"
@@ -1500,33 +1543,37 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
             >
               Export PDF
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (user && user.role === 'OFFICER' && !canImportXlsx) {
-                  setBanner({ type: 'error', message: 'You do not have permission to import using XLSX.' })
-                  return
-                }
-                setShowFormatModal(true)
-              }}
-              disabled={importing}
-              className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
-            >
-              {importing
-                ? 'Importing…'
-                : isStudentView
-                  ? 'Import Students XLSX'
-                  : isEnrolleeView
-                    ? 'Import Enrollees XLSX'
-                    : 'Import Applicants XLSX'}
-            </button>
-            <button
-              type="button"
-              onClick={handleAddNew}
-              className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]"
-            >
-              Add New
-            </button>
+            {!isStudentView && !isEnrolleeView && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user && user.role === 'OFFICER' && !canImportXlsx) {
+                      setBanner({ type: 'error', message: 'You do not have permission to import using XLSX.' })
+                      return
+                    }
+                    setShowFormatModal(true)
+                  }}
+                  disabled={importing}
+                  className="rounded-full border border-rose-200 bg-white px-6 py-3 text-sm font-medium text-[#c4375b] shadow-sm transition hover:border-rose-400 disabled:opacity-60"
+                >
+                  {importing
+                    ? 'Importing…'
+                    : isStudentView
+                      ? 'Import Students XLSX'
+                      : isEnrolleeView
+                        ? 'Import Enrollees XLSX'
+                        : 'Import Applicants XLSX'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddNew}
+                  className="rounded-full bg-[#c4375b] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200/60 transition hover:bg-[#a62a49]"
+                >
+                  Add New
+                </button>
+              </>
+            )}
             </div>
             </div>
 
@@ -1676,7 +1723,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     onKeyDown={handleKeyDown}
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   >
-                                    {CATEGORY_OPTIONS.map((option) => (
+                                    {categoryOptions.map((option) => (
                                       <option key={option} value={option}>
                                         {option}
                                       </option>
@@ -1717,6 +1764,21 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     <option value="">Select</option>
                                     {ENROLLMENT_STATUS_OPTIONS.map((option) => (
                                       <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : column.key === 'batch' ? (
+                                  <select
+                                    value={editingValues[column.key] ?? ''}
+                                    onChange={(event) => handleFieldChange(column.key, event.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full rounded-xl border border-rose-200 bg-white py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none text-center"
+                                    style={{ textAlign: 'center', textAlignLast: 'center', paddingLeft: 0, paddingRight: 0 }}
+                                  >
+                                    <option value="" style={{ textAlign: 'center' }}>Select</option>
+                                    {BATCH_OPTIONS.map((option) => (
+                                      <option key={option} value={option} style={{ textAlign: 'center' }}>
                                         {option}
                                       </option>
                                     ))}
@@ -1854,7 +1916,7 @@ export function RecordsPanel({ token, view = 'applicants', basePath }) {
                                     onChange={(event) => handleInlineStatusChange(row, event.target.value)}
                                     className="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-[#4b1d2d] focus:border-rose-400 focus:outline-none"
                                   >
-                                    {CATEGORY_OPTIONS.map((option) => (
+                                    {categoryOptions.map((option) => (
                                       <option key={option} value={option}>{option}</option>
                                     ))}
                                   </select>
