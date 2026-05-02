@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: herqodess-backend
+    ports:
+      - "3006:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: herqodess-frontend
+    ports:
+      - "3006:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
